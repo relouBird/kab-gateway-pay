@@ -37,7 +37,7 @@
 
 ## Actions
 
-- Initialisation du dépôt local à sa racine ; `main` est la branche principale. `dev` sera créée depuis le commit initial.
+- Initialisation du dépôt local à sa racine ; `main` est la branche principale et `dev` a été créée depuis le commit initial.
 - Validation du choix pnpm workspaces + Turborepo et enregistrement dans ADR-001.
 - Création du workspace pnpm, de sa configuration Turbo, du lockfile et installation des outils racine : Husky, lint-staged, Prettier et Turbo.
 - Ajout de `.gitignore` pour `.agents/`, `master/`, les dépendances, sorties générées et fichiers d'environnement locaux ; `AGENTS.md` à la racine reste versionné.
@@ -60,12 +60,12 @@
 - `pnpm install --frozen-lockfile` — réussi, lockfile à jour.
 - `pnpm exec turbo run build --dry=json` — réussi ; configuration reconnue, aucun package ni tâche applicative n'existe encore.
 - `git check-ignore -v .agents/skills master/` — réussi ; les deux dossiers sont ignorés.
-- `git hook run pre-commit` — réussi après suppression des espaces finaux signalés dans ADR-002 et le journal.
+- `git hook run pre-commit` et hook du commit initial — réussis après suppression des espaces finaux signalés dans ADR-002 et le journal.
+- Commit initial `3827c55` créé sur `main` ; `dev` pointe dessus. `git status` propre après création de `dev`, aucun remote configuré.
 - Build, lint, typecheck et tests applicatifs : non exécutés, car aucun package applicatif n'existe encore.
 
 ## Points ouverts et suite
 
-- Créer le commit initial, puis la branche locale `dev` à partir de `main`.
 - Le remote GitHub et toute publication restent en attente d'une URL et d'une demande explicite.
 - Compléter lint/typecheck/tests dans Husky lorsque les premiers packages et scripts réels seront définis.
-- Arbitrer les points bloquants du CDC-01 avant de figer les contrats d'authentification.
+- Arbitrer les points bloquants du CDC-01 avant de figer les contrats d'authentification et de commencer le code applicatif.
