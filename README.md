@@ -1,6 +1,6 @@
 # KG Pay — Guide développeur
 
-> **État au 22 novembre 2026 :** le workspace pnpm/Turborepo est initialisé (`main` → `dev` → branches de travail), sans remote GitHub. Le backend du cœur 1 est en cours d'implémentation sur une branche dédiée ; le frontend KG Pay n'est pas encore créé.
+> **État au 22 novembre 2026 :** le workspace pnpm/Turborepo et `auth-service` sont présents ; le frontend KG Pay n'est pas encore créé. Le remote `origin` pointe vers GitHub et `dev` suit `origin/dev`.
 
 ## Démarrage d'une nouvelle tâche
 
@@ -44,6 +44,8 @@ Commandes de validation disponibles :
 ```bash
 pnpm install
 pnpm env:build
+pnpm env:runtime
+pnpm dev
 pnpm run build
 pnpm run lint
 pnpm run typecheck
@@ -53,10 +55,12 @@ pnpm --filter auth-service test:e2e
 
 La configuration racine déclare Node.js `>=22.20.0` et pnpm `10.28.2` ; les versions résolues sont verrouillées dans `pnpm-lock.yaml`. Les commandes locales, migrations et essais Swagger d'`auth-service` sont documentés dans [son README](./services/auth-service/README.md).
 
+La configuration locale a une seule source éditable à la racine (`.env`, ignoré par Git). `.env.example` est un modèle sans secrets. Les fichiers par workspace sont générés sous `.generated/env/` ; leur rôle, leur contenu et leur cycle de vie sont décrits dans [docs/README.md](./docs/README.md) et [ADR-001](./docs/architecture/ADR-001-monorepo-microservices.md).
+
 ## Git, hooks et validation
 
 - Le dépôt Git local est initialisé à la racine. `main` est la branche principale et `dev` la branche d'intégration ; les branches de travail partent de `dev`.
-- Aucun remote n'est configuré et aucune branche n'est publiée. Ajouter un remote ou pousser requiert l'URL et l'accord du porteur du projet.
+- `origin` est configuré. Créer une branche de travail depuis `dev` ; pousser et ouvrir une PR suivent la demande du porteur du projet.
 - Husky exécute avant chaque commit `lint-staged`, puis les scripts racine de lint, typecheck et tests, et enfin `git diff --cached --check`.
 - La CI doit compléter les hooks locaux ; un hook ne remplace pas les suites de tests ou la revue.
 - Ne pas ajouter des hooks, scripts ou fichiers de configuration qui prétendent valider sans lancer de vérification effective.

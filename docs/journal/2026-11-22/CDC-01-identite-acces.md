@@ -17,3 +17,14 @@
   - Migration réelle, scénario d'authentification avec PostgreSQL/Maildev et essai Swagger — non exécutés : le démon Docker n'est pas disponible (`dockerDesktopLinuxEngine` absent).
 - **Points ouverts :** la récupération d'un compte CUSTOMER après perte d'accès à son e-mail, les paramètres de récupération proposés et le SMTP de production restent à arbitrer. Le broker d'événements n'est pas choisi. L'interface frontend n'est pas incluse dans cette tranche backend.
 - **Suite attendue :** démarrer Docker, appliquer les migrations, générer les clés locales, amorcer le GLOBAL_SUPER_ADMIN, puis vérifier dans Swagger l'inscription, la connexion avec OTP, les sessions et les routes protégées.
+
+## Mise à jour — Source d'environnement unique
+
+- **Objectif :** aligner le critère d'acceptation 12 avec la génération des environnements documentée dans ADR-001 §5.
+- **Statut :** terminé pour l'alignement documentaire et la validation locale du mécanisme.
+- **Résumé :** le critère précise que `auth-service` démarre avec ses variables runtime propres, générées depuis la source centrale, et échoue si sa configuration est invalide. Les détails d'implémentation et les chemins générés sont documentés dans ADR-001 et le README du service.
+- **Chemins modifiés :** `docs/cdc/CDC-01-identite-acces.md`, `services/auth-service/README.md`, `services/auth-service/env.schema.json`, `services/auth-service/src/config/runtime-env.ts`, `services/auth-service/package.json`, `scripts/generate-env.cjs`, `scripts/run-with-env.cjs`, `scripts/run-prisma.cjs`, `.env.example`.
+- **Exigences/sections concernées :** CDC-01 §11, critère 12 ; ADR-001 §5.
+- **Validations :** `pnpm run build`, `pnpm run typecheck`, `pnpm run lint` et `pnpm test` réussis ; le chargeur runtime compilé a lu la sortie générée à la racine. Aucune migration ni recette e2e avec un serveur PostgreSQL/Maildev actif n'a été exécutée.
+- **Points ouverts :** configurer localement les valeurs et clés runtime, puis vérifier la migration et les parcours du CDC-01 avec PostgreSQL et Maildev.
+- **Suite attendue :** préparer `.env` depuis `.env.example`, démarrer les dépendances selon le mode choisi et reprendre la recette fonctionnelle.

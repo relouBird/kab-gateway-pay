@@ -10,6 +10,7 @@ node_modules/
 .turbo/
 dist/
 coverage/
+/.generated/
 
 # Local environment and generated environment files
 .env

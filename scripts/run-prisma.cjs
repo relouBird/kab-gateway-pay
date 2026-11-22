@@ -6,15 +6,38 @@ const { spawnSync } = require('node:child_process');
 
 const rootDir = path.resolve(__dirname, '..');
 const serviceDir = path.join(rootDir, 'services', 'auth-service');
+const generateEnv = spawnSync(
+  process.execPath,
+  [
+    path.join(rootDir, 'scripts', 'generate-env.cjs'),
+    '--target',
+    'auth-service',
+    '--mode',
+    'runtime',
+  ],
+  {
+    cwd: rootDir,
+    env: process.env,
+    stdio: 'inherit',
+  },
+);
 
-for (const filePath of [
-  path.join(serviceDir, '.env.local'),
-  path.join(serviceDir, 'build.env'),
-]) {
-  if (fs.existsSync(filePath)) {
-    process.loadEnvFile(filePath);
-  }
+if (generateEnv.error) throw generateEnv.error;
+if (generateEnv.status !== 0) {
+  process.exitCode = generateEnv.status ?? 1;
+  process.exit();
 }
+
+const runtimeEnv = path.join(
+  rootDir,
+  '.generated',
+  'env',
+  'auth-service.runtime.env',
+);
+if (!fs.existsSync(runtimeEnv)) {
+  throw new Error('Generated auth-service runtime environment is missing.');
+}
+process.loadEnvFile(runtimeEnv);
 
 const command = process.platform === 'win32' ? 'prisma.cmd' : 'prisma';
 const result = spawnSync(command, process.argv.slice(2), {

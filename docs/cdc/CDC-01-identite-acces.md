@@ -452,7 +452,7 @@ Le cœur 1 est recevable en V1 lorsque :
 9. Désactiver un collaborateur révoque ses sessions et publie `IdentityDisabled`.
 10. Chaque action sensible produit un événement d'audit, y compris en cas de panne du broker (outbox).
 11. Aucun secret n'apparaît dans les journaux, les événements ou les réponses d'erreur.
-12. Le service démarre seul, avec ses seules variables (`build.env` + secrets), et refuse de démarrer si la configuration est invalide.
+12. Le service démarre seul avec ses seules variables runtime, générées depuis la source d'environnement centrale conformément à ADR-001 §5, et refuse de démarrer si la configuration est invalide.
 
 ## 12. Impacts sur les cœurs suivants et sur le référentiel
 

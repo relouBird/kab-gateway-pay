@@ -2,21 +2,20 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 export function loadRuntimeEnvironment(): void {
-  const localSecrets = resolve(process.cwd(), '.env.local');
-  if (existsSync(localSecrets)) {
-    process.loadEnvFile(localSecrets);
-  }
-
-  const buildEnvCandidates = [
-    resolve(__dirname, 'build.env'),
-    resolve(__dirname, '..', 'build.env'),
-    resolve(__dirname, '..', '..', 'build.env'),
-    resolve(process.cwd(), 'build.env'),
-  ];
-  const buildEnv = buildEnvCandidates.find((candidate) =>
-    existsSync(candidate),
+  const runtimeEnv = resolve(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    '..',
+    '.generated',
+    'env',
+    'auth-service.runtime.env',
   );
-  if (buildEnv) {
-    process.loadEnvFile(buildEnv);
+  if (!existsSync(runtimeEnv)) {
+    throw new Error(
+      'Generated auth-service runtime environment is missing; start the service with its pnpm script or run pnpm env:runtime.',
+    );
   }
+  process.loadEnvFile(runtimeEnv);
 }

@@ -15,34 +15,59 @@ Les permissions métier des rôles `OPERATIONS_ADMIN` et `CONFIGURATION_ADMIN` s
 
 ## Démarrage local
 
-Prérequis : Node.js `>=22.20.0`, pnpm `10.28.2` et Docker.
+Prérequis : Node.js `>=22.20.0`, pnpm `10.28.2` et un serveur PostgreSQL. pgAdmin est l'outil graphique pour administrer PostgreSQL ; il ne remplace pas le serveur PostgreSQL.
 
-Depuis la racine du dépôt :
+### Démarrer les dépendances
+
+PostgreSQL peut être fourni de deux façons :
+
+1. **Installation locale** : démarrer le service PostgreSQL installé sur la machine, ouvrir pgAdmin, créer la base `kgpay_auth`, puis utiliser dans `.env` l'utilisateur, le mot de passe, le port et le nom de base réellement configurés.
+2. **Docker facultatif** : depuis la racine, lancer `docker compose -f docker-compose.dev.yml up -d postgres`. L'image crée la base `kgpay_auth` configurée par le compose. Pour l'arrêter sans supprimer son volume, lancer `docker compose -f docker-compose.dev.yml stop postgres`.
+
+Maildev peut également être lancé de deux façons :
+
+1. **Installation npm globale** : installer une fois avec `npm install -g maildev`, puis démarrer dans un terminal avec `maildev`.
+2. **Docker facultatif** : depuis la racine, lancer `docker compose -f docker-compose.dev.yml up -d maildev`.
+
+Les deux modes exposent SMTP sur `127.0.0.1:1025` et l'interface Maildev sur `http://127.0.0.1:1080`. Le compose est une option, pas un prérequis ; ne pas démarrer en même temps deux instances qui tentent d'utiliser les mêmes ports.
+
+### Préparer la source d'environnement unique
+
+Depuis la racine du dépôt, créer le `.env` local à partir du modèle :
 
 ```powershell
-pnpm install
-docker compose -f docker-compose.dev.yml up -d postgres maildev
+Copy-Item .env.example .env
+```
+
+Le `.env` racine ignoré par Git est l'unique fichier de configuration à modifier. Renseigner notamment :
+
+- `DATABASE_URL__AUTH_SERVICE` avec l'URL PostgreSQL et les identifiants configurés sur la machine ; encoder les caractères spéciaux du mot de passe selon le format URL.
+- Les paramètres `SMTP_*__AUTH_SERVICE` si Maildev n'écoute pas à l'adresse/au port par défaut du modèle.
+
+Générer les clés locales :
+
+```powershell
 pnpm --filter auth-service auth:keygen
 ```
 
-La commande `auth:keygen` crée une paire RSA et deux clés HMAC dans `services/auth-service/.local-secrets/`. Elle n'affiche pas les secrets et ne doit être exécutée qu'une fois. Créer ensuite `services/auth-service/.env.local` (ignoré par Git) avec les paramètres runtime suivants :
+La commande crée une paire RSA et deux clés HMAC dans `services/auth-service/.local-secrets/` et n'affiche pas le contenu des secrets. Reporter dans le `.env` racine les valeurs indiquées par la commande (`JWT_PRIVATE_KEY_FILE__AUTH_SERVICE`, `JWT_KEY_ID__AUTH_SERVICE`, `OTP_HASH_KEY__AUTH_SERVICE` et, en local si souhaité, `IP_HASH_KEY__AUTH_SERVICE`). Ne jamais committer le `.env`, les clés ou les sorties runtime.
 
-```dotenv
-DATABASE_URL=postgresql://kgpay@127.0.0.1:5432/kgpay_auth?schema=public
-JWT_PRIVATE_KEY_FILE=.local-secrets/auth-private.pem
-JWT_KEY_ID=<identifiant affiché par auth:keygen>
-OTP_HASH_KEY=<contenu de .local-secrets/otp-hash.key>
-IP_HASH_KEY=<contenu de .local-secrets/ip-hash.key>
+### Emplacement et cycle de vie des fichiers générés
+
+Le générateur lit `.env` à la racine et filtre les variables avec `services/auth-service/env.schema.json`. Il ne lit pas `.env` directement dans le code métier.
+
+- `.generated/env/auth-service.build.env` : variables non secrètes autorisées au build. Ce fichier ne contient ni `DATABASE_URL`, ni clés, ni credentials ; il n'est pas copié dans `dist`.
+- `.generated/env/auth-service.runtime.env` : variables du processus `auth-service`, dont `DATABASE_URL` et les secrets nécessaires au service. `start`, `start:dev`, `start:prod`, la CLI d'initialisation et les commandes de migration le génèrent ou le chargent automatiquement.
+- Les deux fichiers sont générés sous `.generated/env/` à la racine, ignorés par Git et remplaçables à tout moment. Les autres workspaces produiront des fichiers avec leur propre nom, par exemple `.generated/env/customer-portal.build.env`.
+
+Commandes de génération explicite :
+
+```powershell
+pnpm env:build
+pnpm env:runtime
 ```
 
-`OTP_HASH_KEY` est obligatoire dans tous les environnements. `IP_HASH_KEY` est obligatoire en production. En production, fournir aussi les credentials SMTP si nécessaires, les secrets des clients de service et les clés publiques précédentes pendant la période de chevauchement d'une rotation JWT. Ne jamais copier ces valeurs dans `global.env`, `service.env`, `build.env`, les journaux ou les commits.
-
-La configuration non secrète est assemblée au build :
-
-- `env/global.env` ne fournit que les clés communes autorisées par `sharedKeys`.
-- `services/auth-service/service.env` contient les valeurs non secrètes propres au service.
-- `pnpm env:build` valide et écrit `services/auth-service/build.env`; le build du service copie ensuite ce fichier dans `dist`.
-- Au démarrage, le service charge `.env.local` puis `build.env`; l'environnement fourni par l'orchestrateur reste prioritaire.
+Le build et le démarrage via Turbo déclenchent eux-mêmes la génération appropriée. Les secrets ne sont jamais injectés dans les builds ni les bundles frontend.
 
 Appliquer la migration et lancer le service :
 

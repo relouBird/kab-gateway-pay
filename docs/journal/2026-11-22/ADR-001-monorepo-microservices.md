@@ -1,10 +1,18 @@
 # Journal — ADR-001 — 2026-11-22
 
-- **Objectif :** implémenter le mécanisme de configuration non secrète décrit par ADR-001 §5 pour `auth-service`.
-- **Statut :** terminé.
-- **Résumé :** ajout de `env/global.env`, d'un schéma JSON avec allowlist et `sharedKeys`, de `service.env` et d'un générateur Node portable. Le générateur filtre `global.env` par `sharedKeys`, laisse `service.env` prioritaire, valide les clés/valeurs et produit `build.env` ignoré. `DATABASE_URL`, `SMTP_USER`, `SMTP_PASSWORD` et toute clé contenant `JWT` sont explicitement refusés. `service.env` comprend les paramètres numériques OTP/sessions/sécurité de CDC-01 §8.5, marqués comme valeurs proposées, ainsi que les paramètres de cookie et CORS (`AUTH_CORS_ORIGINS` vide par défaut). Suppression de l'ancien `.env.example`.
-- **Fichiers modifiés :** `env/global.env`, `services/auth-service/env.schema.json`, `services/auth-service/service.env`, `scripts/build-env.cjs`, `services/auth-service/README.md`, `services/auth-service/.env.example` (supprimé), `docs/architecture/ADR-001-monorepo-microservices.md`, `docs/README.md`.
-- **Sections concernées :** ADR-001 §3 et §5 ; documentation des variables d'environnement et du bootstrap `auth-service`.
-- **Validations :** `pnpm env:build`, `pnpm --filter auth-service build`, `pnpm --filter auth-service typecheck` et `docker compose -f docker-compose.dev.yml config --quiet` réussis. Prisma Client est généré et `prisma validate` réussit avec une URL locale factice. La validation des tests et du lint est consignée dans le journal CDC-01.
-- **Points ouverts :** les valeurs OTP de `service.env` restent les valeurs par défaut proposées par CDC-01 §8.5, à valider avant production. Les secrets restent à injecter à l'exécution. Le démon Docker étant indisponible, la migration réelle et le démarrage du service n'ont pas été vérifiés.
-- **Suite attendue :** démarrer PostgreSQL/Maildev avec Docker, appliquer la migration, puis vérifier le parcours et Swagger en fonctionnement sans exposer de secrets.
+- **Objectif :** remplacer la configuration répartie entre `env/global.env`, `service.env` et `.env.local` par une source locale unique, et faire générer une configuration limitée à chaque workspace et à son usage.
+- **Statut :** terminé pour le mécanisme et la documentation ; les essais avec un PostgreSQL/Maildev réellement démarré restent à faire.
+- **Résumé :** D6 et ADR-001 §3/§5/§8 décrivent désormais le `.env` racine ignoré par Git, `.env.example` sans secrets et les sorties `.generated/env/<workspace>.build.env` (non secrètes) et `.runtime.env` (secrets runtime autorisés, jamais intégrés à `dist`). Le générateur découvre les schémas de `apps/`, `packages/` et `services/`, valide les clés/valeurs, applique `GLOBAL__<KEY>` aux `sharedKeys`, et retire le suffixe `__<targetPrefix>` des clés propres. Turbo et les scripts de `auth-service` génèrent les fichiers avant les opérations concernées. Le chemin du chargeur runtime a été corrigé pour remonter jusqu'à la racine du dépôt. La documentation précise les options PostgreSQL local avec pgAdmin ou Docker, et Maildev via npm global ou Docker ; Docker Compose reste facultatif.
+- **Chemins modifiés :** `.env.example`, `.gitignore`, `AGENTS.md`, `README.md`, `docs/README.md`, `docs/architecture/ADR-001-monorepo-microservices.md`, `docs/cdc/CDC-01-identite-acces.md`, `scripts/generate-env.cjs`, `scripts/generate-env.test.cjs`, `scripts/run-with-env.cjs`, `scripts/run-prisma.cjs`, `scripts/generate-signing-keys.cjs`, `services/auth-service/AGENTS.md`, `services/auth-service/README.md`, `services/auth-service/env.schema.json`, `services/auth-service/package.json`, `services/auth-service/src/config/runtime-env.ts`, `package.json`, `turbo.json`; suppression de `env/global.env`, `services/auth-service/service.env`, `scripts/build-env.cjs` et `scripts/copy-build-env.cjs`.
+- **Exigences/sections concernées :** ADR-001 D6 et §§3, 5, 8 ; CDC-01 §11, critère 12 (configuration runtime propre au service).
+- **Validations :**
+  - `node --test scripts/generate-env.test.cjs` — réussi, 3 tests.
+  - `pnpm run build` — réussi.
+  - `pnpm run typecheck` — réussi.
+  - `pnpm run lint` — réussi.
+  - `pnpm test` — réussi, 3 tests du générateur, 8 suites et 20 tests de `auth-service`.
+  - Génération build/runtime avec une copie temporaire de `.env.example` et valeurs de test — réussie ; vérification que les clés runtime ne figurent pas dans la sortie build.
+  - Chargeur runtime compilé — réussi ; il a lu le fichier généré sous `.generated/env/` à la racine. Les fichiers temporaires `.env` et `.generated/env/*` ont été retirés après les essais.
+  - Migration avec vraie base PostgreSQL, démarrage de Maildev et recette HTTP — non exécutés, ces dépendances n'ayant pas été démarrées dans cette tâche.
+- **Points ouverts :** le porteur doit renseigner son `.env` local, choisir le démarrage natif ou Docker des dépendances, créer/configurer la base PostgreSQL et générer les clés locales. Aucun secret réel n'a été ajouté ni conservé.
+- **Suite attendue :** choisir le mode local de PostgreSQL/Maildev, compléter `.env` depuis `.env.example`, appliquer la migration Prisma et exécuter la recette du CDC-01.
