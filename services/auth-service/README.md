@@ -30,6 +30,7 @@ Maildev peut également être lancé de deux façons :
 2. **Docker facultatif** : depuis la racine, lancer `docker compose -f docker-compose.dev.yml up -d maildev`.
 
 Les deux modes exposent SMTP sur `127.0.0.1:1025` et l'interface Maildev sur `http://127.0.0.1:1080`. Le compose est une option, pas un prérequis ; ne pas démarrer en même temps deux instances qui tentent d'utiliser les mêmes ports.
+Pour exécuter le test e2e SMTP réel, l'instance doit également exposer le MCP Maildev 3 : lancer l'installation npm avec `maildev --mcp`. Le serveur MCP est alors disponible sur `http://127.0.0.1:1080/mcp`. Ne pas redémarrer une instance déjà active uniquement pour ce test ; si MCP n'est pas activé, le test échoue explicitement.
 
 ### Préparer la source d'environnement unique
 
@@ -112,10 +113,12 @@ pnpm typecheck:auth-service
 pnpm test:auth-service
 pnpm test:e2e:auth-service
 pnpm test:e2e:auth-service:isolated
+pnpm test:e2e:auth-service:maildev
 pnpm build:auth-service
 ```
 
 `pnpm test:e2e:auth-service` exécute le test e2e de liveness. `pnpm test:e2e:auth-service:isolated` exécute les parcours d'intégration HTTP sur une base PostgreSQL locale : inscription, MFA, step-up, sessions/refresh/logout, récupération de mot de passe, amorçage du super-admin et invitation/MFA STAFF avec contrôle de permission. Le runner crée un schéma au nom aléatoire, applique les migrations, remplace les transports email par des boîtes mémoire de test pour récupérer OTP et invitation, puis supprime uniquement ce schéma. Il refuse les URL de base qui ne pointent pas vers localhost. Ces tests n'exercent donc pas la livraison SMTP réelle ni l'ensemble des critères de recette CDC-01.
+`pnpm test:e2e:auth-service:maildev` utilise le même schéma isolé, mais conserve le transport SMTP configuré et récupère les OTP via les outils MCP de l'instance Maildev locale. Il n'envoie des messages qu'à une adresse synthétique `example.test`, refuse un `SMTP_HOST` distant et supprime uniquement les messages reçus par cette adresse. La commande exige `maildev --mcp` ; elle n'arrête ni ne relance Maildev.
 
 La CLI `pnpm auth:bootstrap` est une commande interactive de premier amorçage, pas un endpoint HTTP/Swagger. Son script actuel dépend du workspace pnpm, de `ts-node`, du fichier runtime généré à la racine et d'un terminal permettant la saisie masquée. L'usage après déploiement n'est pas validé : il faudra un artefact incluant le CLI compilé, la configuration runtime attendue et un shell interactif avant de considérer cette procédure exploitable en production.
 
