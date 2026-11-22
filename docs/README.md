@@ -37,7 +37,7 @@ Les documents sont dans `docs/`. En cas de conflit, l'ordre de priorité est le 
 4. **Le référentiel v0.3** (`docs/KG Pay – Core Business Version-0.3.md`), pour la vision, le vocabulaire, les règles RP et les diagrammes.
 5. Les versions v0.1 et v0.2 : **historique uniquement**, ne pas les utiliser pour décider.
 
-Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration et des branches de travail dérivées de `dev`. Le workspace pnpm/Turborepo et le remote `origin` sont en place. `auth-service` implémente les parcours backend du CDC-01 ; les tests unitaires existent, mais la recette avec base de données, SMTP et parcours HTTP complets reste à exécuter. Le frontend applicatif n'est pas encore livré.
+Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration et des branches de travail dérivées de `dev`. Le workspace pnpm/Turborepo et le remote `origin` sont en place. `auth-service` possède des tests unitaires et des parcours HTTP intégrés couvrant l'inscription CUSTOMER, l'OTP e-mail simulé, la connexion MFA, le step-up, les sessions/refresh/logout, la récupération du mot de passe, l'amorçage du super-admin et l'invitation/MFA STAFF sur un schéma PostgreSQL temporaire isolé. Ces essais ne valident pas le transport SMTP réel et ne constituent pas à eux seuls la recette complète du CDC-01 ; les autres scénarios d'administration et de sécurité restent à couvrir. Le frontend applicatif n'est pas encore livré.
 
 Le template de dossier est mentionné dans des documents existants, mais aucun fichier de template n'est présent dans `docs/` à la date de cette revue. Ne pas supposer qu'il existe ; le créer ou corriger les références avant de l'utiliser.
 
@@ -145,6 +145,7 @@ pnpm run lint
 pnpm run typecheck
 pnpm run test
 pnpm test:e2e:auth-service
+pnpm test:e2e:auth-service:isolated
 pnpm build:auth-service
 pnpm start:auth-service
 pnpm auth:keygen
@@ -156,6 +157,8 @@ pnpm db:auth-service:migrate:deploy
 Les commandes racine fournissent les alias ciblés par workspace (`build:auth-service`, `start:auth-service`, `db:auth-service:*`, `test:*:auth-service`). Les scripts `build`, `dev`, `lint`, `typecheck` et `test` restent dans le manifest de chaque workspace car Turbo les appelle directement.
 
 Pour `auth-service`, copier `.env.example` vers `.env`, renseigner l'URL PostgreSQL et les clés runtime, puis démarrer avec `pnpm start:auth-service`. Le générateur ciblé est également exécuté automatiquement par les commandes de démarrage et de migration.
+
+En développement/test, `/docs` expose Swagger UI et `/docs-json` le contrat OpenAPI exploitable par un outil ou un agent. Une collection Postman couvrant les opérations documentées est disponible dans [`services/auth-service/collections/auth-service.postman_collection.json`](../services/auth-service/collections/auth-service.postman_collection.json).
 
 ## 9. Workflow d'un cœur métier
 

@@ -68,7 +68,7 @@ export class OtpService {
 
     await this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${identity.id}), hashtext(${purpose}))
+        SELECT pg_advisory_xact_lock(hashtext(${identity.id}), hashtext(${purpose}))::text
       `;
       const mostRecent = await transaction.otpChallenge.findFirst({
         where: {

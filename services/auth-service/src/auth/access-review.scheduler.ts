@@ -66,10 +66,10 @@ export class AccessReviewScheduler implements OnModuleInit, OnModuleDestroy {
       await this.prisma.$transaction(
         async (transaction) => {
           await transaction.$queryRaw`
-            SELECT pg_advisory_xact_lock(hashtext('kgpay-global-admin-invariant'))
+            SELECT pg_advisory_xact_lock(hashtext('kgpay-global-admin-invariant'))::text
           `;
           await transaction.$queryRaw`
-            SELECT pg_advisory_xact_lock(hashtext(${identity.id}))
+            SELECT pg_advisory_xact_lock(hashtext(${identity.id}))::text
           `;
           const current = await transaction.identity.findUnique({
             where: { id: identity.id },

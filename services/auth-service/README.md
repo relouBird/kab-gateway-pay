@@ -76,7 +76,7 @@ pnpm db:auth-service:migrate:dev
 pnpm start:auth-service
 ```
 
-Le service écoute sur `http://localhost:3000`. Swagger est disponible sur [`http://localhost:3000/docs`](http://localhost:3000/docs) en développement/test uniquement. La liveness `GET /health` ne nécessite ni authentification ni accès à la base une fois le service démarré.
+Le service écoute sur `http://localhost:3000`. Swagger est disponible sur [`http://localhost:3000/docs`](http://localhost:3000/docs) et son contrat OpenAPI JSON sur [`http://localhost:3000/docs-json`](http://localhost:3000/docs-json), en développement/test uniquement. La liveness `GET /health` ne nécessite ni authentification ni accès à la base une fois le service démarré.
 
 Maildev reçoit les messages sur `127.0.0.1:1025` et expose sa boîte de réception sur [`http://127.0.0.1:1080`](http://127.0.0.1:1080). Aucune authentification SMTP n'est configurée dans les fichiers versionnés.
 
@@ -91,6 +91,14 @@ Maildev reçoit les messages sur `127.0.0.1:1025` et expose sa boîte de récept
 
 Swagger conserve les cookies nécessaires au même hôte mais ne persiste pas les jetons d'autorisation dans le navigateur. Les routes internes d'introspection nécessitent une entrée runtime `AUTH_SERVICE_CLIENTS_JSON` et les schémas Swagger `service_client`/`service_secret`.
 
+## Contrat API et collection Postman
+
+`GET /docs-json` est le document OpenAPI 3.0 généré depuis les contrôleurs et DTO ; il répertorie les 38 opérations HTTP de l'API et leurs schémas. Il permet à Swagger UI, Postman et aux agents de découvrir les routes sans parcourir le code. Swagger et le JSON OpenAPI sont désactivés en production.
+
+La collection [auth-service.postman_collection.json](./collections/auth-service.postman_collection.json) reprend ces 38 opérations et leurs corps requis. Importer le fichier dans Postman, créer/sélectionner un environnement local non partagé, définir `baseUrl` et y renseigner les variables de test. Les OTP doivent être lus dans Maildev et saisis dans `otpCode` ; après une réponse, les valeurs `challengeId`, `accessToken`, `sessionId`, `proof` et `csrfToken` sont enregistrées dans l'environnement actif lorsqu'elles sont présentes. Le cookie jar Postman conserve les cookies refresh/CSRF ; appeler `GET /auth/csrf` avant les opérations refresh/logout et après chaque rotation.
+
+Ne pas enregistrer de vrais mots de passe, OTP, preuves, jetons ou credentials de service dans la collection partagée. Les identifiants doivent être configurés comme variables locales Postman.
+
 ## Migrations et qualité
 
 Les migrations Prisma sont versionnées sous `prisma/migrations/`. La migration initiale protège aussi `AccessEvent` contre les mises à jour/suppressions. Commandes disponibles :
@@ -103,7 +111,12 @@ pnpm lint:auth-service
 pnpm typecheck:auth-service
 pnpm test:auth-service
 pnpm test:e2e:auth-service
+pnpm test:e2e:auth-service:isolated
 pnpm build:auth-service
 ```
+
+`pnpm test:e2e:auth-service` exécute le test e2e de liveness. `pnpm test:e2e:auth-service:isolated` exécute les parcours d'intégration HTTP sur une base PostgreSQL locale : inscription, MFA, step-up, sessions/refresh/logout, récupération de mot de passe, amorçage du super-admin et invitation/MFA STAFF avec contrôle de permission. Le runner crée un schéma au nom aléatoire, applique les migrations, remplace les transports email par des boîtes mémoire de test pour récupérer OTP et invitation, puis supprime uniquement ce schéma. Il refuse les URL de base qui ne pointent pas vers localhost. Ces tests n'exercent donc pas la livraison SMTP réelle ni l'ensemble des critères de recette CDC-01.
+
+La CLI `pnpm auth:bootstrap` est une commande interactive de premier amorçage, pas un endpoint HTTP/Swagger. Son script actuel dépend du workspace pnpm, de `ts-node`, du fichier runtime généré à la racine et d'un terminal permettant la saisie masquée. L'usage après déploiement n'est pas validé : il faudra un artefact incluant le CLI compilé, la configuration runtime attendue et un shell interactif avant de considérer cette procédure exploitable en production.
 
 Les valeurs numériques du CDC-01 §8.5 restent des valeurs proposées configurables, pas des décisions métier. Les interfaces client/personnel, le parcours support de récupération d'un `CUSTOMER` ayant perdu sa boîte e-mail, le fournisseur SMTP de production et le choix du broker restent ouverts. En attendant le broker, le relay local journalise uniquement les identifiants/noms d'événement ; les payloads restent dans l'outbox et ne sont pas envoyés à des consommateurs.

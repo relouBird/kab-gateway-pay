@@ -15,7 +15,7 @@ Le CDC d'un cœur couvre ses exigences frontend **et** backend. Ne pas créer un
 
 ## État de la base applicative
 
-- `services/auth-service` implémente les parcours backend du CDC-01 : OTP e-mail obligatoire, rôles, sessions, administration, audit, outbox, Swagger et persistance PostgreSQL/Prisma. Les validations de fin et la recette sont documentées dans le journal ; le frontend KG Pay reste à construire.
+- `services/auth-service` implémente les parcours backend du CDC-01 : OTP e-mail obligatoire, rôles, sessions, administration, audit, outbox, Swagger et persistance PostgreSQL/Prisma. Les tests d'intégration couvrent les parcours principaux CUSTOMER (inscription, MFA, step-up, session/refresh/logout et récupération) ainsi que l'amorçage du super-admin et l'invitation/MFA STAFF, sur un schéma PostgreSQL temporaire isolé. Les autres exigences et scénarios de sécurité du CDC-01 restent à couvrir avant de déclarer la recette complète. Le frontend KG Pay reste à construire.
 - `nexus-gate-web` est un exemple séparé de frontend avec des pages d'authentification, Yup, Zustand et Axios. Il sert de référence de conventions, pas de backend, de contrat API ou de modèle d'identité à recopier.
 - Le CDC-01 exige un OTP par e-mail après le mot de passe, à chaque nouvelle connexion, pour `CUSTOMER` comme pour `STAFF`. La boîte e-mail devient un facteur de sécurité critique ; cette solution est moins indépendante qu'un authenticator.
 - Seul l'e-mail est un identifiant vérifié. Le téléphone est conservé comme moyen de contact non vérifié, sans login, OTP SMS ni récupération de compte.
@@ -51,6 +51,7 @@ pnpm run lint
 pnpm run typecheck
 pnpm run test
 pnpm test:e2e:auth-service
+pnpm test:e2e:auth-service:isolated
 pnpm build:auth-service
 pnpm start:auth-service
 pnpm auth:keygen
@@ -60,6 +61,8 @@ pnpm db:auth-service:migrate:deploy
 ```
 
 La configuration racine déclare Node.js `>=22.20.0` et pnpm `10.28.2` ; les versions résolues sont verrouillées dans `pnpm-lock.yaml`. Les commandes locales, migrations et essais Swagger d'`auth-service` sont documentés dans [son README](./services/auth-service/README.md).
+
+En développement/test, Swagger est accessible sur `/docs` et son contrat OpenAPI JSON sur `/docs-json`. La collection Postman du service est versionnée dans [`services/auth-service/collections/auth-service.postman_collection.json`](./services/auth-service/collections/auth-service.postman_collection.json).
 
 Les scripts racine sont les commandes d'entrée pour les opérations courantes ciblées par workspace (`build:auth-service`, `start:auth-service`, `db:auth-service:*`, `test:*:auth-service`). Les scripts `build`, `dev`, `lint`, `typecheck` et `test` restent déclarés dans chaque workspace pour l'orchestration Turbo.
 
