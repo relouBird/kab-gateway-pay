@@ -19,6 +19,7 @@ coverage/
 *.local
 *.local.*
 **/build.env
+**/.local-secrets/
 
 # Logs and operating system files
 *.log

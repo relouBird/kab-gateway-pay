@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubjectType {
+  CUSTOMER
+  STAFF
+}
+
+enum IdentityStatus {
+  PENDING_VERIFICATION
+  PENDING_INVITATION
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum OtpPurpose {
+  CONTACT_VERIFICATION
+  LOGIN
+  PASSWORD_RECOVERY
+  STEP_UP
+}
+
+model Identity {
+  id                    String          @id @db.Uuid
+  subjectType           SubjectType
+  email                 String          @unique
+  emailNormalized       String          @unique
+  emailVerifiedAt       DateTime?
+  phone                 String
+  passwordHash          String?
+  status                IdentityStatus  @default(PENDING_VERIFICATION)
+  failedLoginCount      Int             @default(0)
+  lockoutCount          Int             @default(0)
+  lockedUntil           DateTime?
+  lastLoginAt           DateTime?
+  passwordChangedAt     DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  roles                 IdentityRole[]
+  otpChallenges         OtpChallenge[]
+  sessions              SessionFamily[]
+  invitations           Invitation[]
+  accessEvents          AccessEvent[]
+  assignedRoles         IdentityRole[]  @relation("RoleAssigner")
+  stepUpProofs          StepUpProof[]
+
+  @@index([subjectType, status, lastLoginAt])
+}
+
+model Role {
+  id          String           @id @db.Uuid
+  code        String           @unique
+  name        String
+  builtIn     Boolean          @default(false)
+  permissions RolePermission[]
+  identities  IdentityRole[]
+  createdAt   DateTime         @default(now())
+}
+
+model RolePermission {
+  roleId     String   @db.Uuid
+  permission String
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permission])
+}
+
+model IdentityRole {
+  identityId String    @db.Uuid
+  roleId     String    @db.Uuid
+  assignedBy String?   @db.Uuid
+  assignedAt DateTime  @default(now())
+  identity   Identity  @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  role       Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  assigner   Identity? @relation("RoleAssigner", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+  @@id([identityId, roleId])
+  @@index([roleId])
+}
+
+model OtpChallenge {
+  id           String     @id @db.Uuid
+  identityId   String     @db.Uuid
+  targetEmail  String
+  purpose      OtpPurpose
+  action       String?
+  codeSalt     String
+  codeHash     String
+  credentialVersion String?
+  attempts     Int        @default(0)
+  sentAt       DateTime   @default(now())
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  identity     Identity   @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@index([identityId, purpose, sentAt])
+  @@index([expiresAt, consumedAt])
+}
+
+model SessionFamily {
+  id                 String         @id @db.Uuid
+  identityId         String         @db.Uuid
+  ipAddress          String?
+  userAgent          String?
+  createdAt          DateTime       @default(now())
+  lastActivityAt     DateTime       @default(now())
+  absoluteExpiresAt  DateTime
+  revokedAt          DateTime?
+  revocationReason   String?
+  identity           Identity       @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  refreshTokens      RefreshToken[]
+  stepUpProofs       StepUpProof[]
+
+  @@index([identityId, revokedAt, lastActivityAt])
+}
+
+model RefreshToken {
+  id          String        @id @db.Uuid
+  familyId    String        @db.Uuid
+  tokenHash   String        @unique
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  family      SessionFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId, expiresAt])
+}
+
+model Invitation {
+  id          String    @id @db.Uuid
+  identityId  String    @db.Uuid
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  identity    Identity  @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt, consumedAt])
+}
+
+model IpLoginAttempt {
+  ipHash          String   @id
+  windowStartedAt DateTime
+  attemptCount    Int      @default(0)
+  lockedUntil     DateTime?
+  updatedAt       DateTime @updatedAt
+}
+
+model AccessEvent {
+  id            String    @id @db.Uuid
+  identityId    String?   @db.Uuid
+  eventType     String
+  result        String
+  ipAddress     String?
+  userAgent     String?
+  correlationId String
+  occurredAt    DateTime  @default(now())
+  metadata      Json?
+  identity      Identity? @relation(fields: [identityId], references: [id], onDelete: Restrict)
+
+  @@index([identityId, occurredAt])
+  @@index([eventType, occurredAt])
+}
+
+model OutboxEvent {
+  id            String    @id @db.Uuid
+  eventName     String
+  schemaVersion Int       @default(1)
+  payload       Json
+  occurredAt    DateTime  @default(now())
+  publishedAt   DateTime?
+  loggedAt      DateTime?
+  attempts      Int       @default(0)
+  lastError     String?
+
+  @@index([publishedAt, occurredAt])
+  @@index([loggedAt, occurredAt])
+}
+
+model StepUpProof {
+  id          String   @id @db.Uuid
+  identityId  String   @db.Uuid
+  sessionId   String   @db.Uuid
+  action      String
+  jti         String   @unique
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime @default(now())
+  identity    Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  session     SessionFamily @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([identityId, sessionId, expiresAt])
+}
+
+model ServiceClient {
+  clientId    String   @id
+  secretHash  String
+  permissions String[]
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

@@ -10,7 +10,7 @@ Plateforme d'agrégation et d'orchestration de paiements : elle centralise plusi
 
 | Cœur | Intitulé                            | Service                | CDC                                                                             | Code                                                                |
 | ---- | ----------------------------------- | ---------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| 1    | Identité et accès                   | `auth-service`         | Base V1 validée, points ouverts conservés (`docs/cdc/CDC-01-identite-acces.md`) | Squelette avec liveness `GET /health` ; aucun parcours métier livré |
+| 1    | Identité et accès                   | `auth-service`         | Base V1 validée, points ouverts conservés (`docs/cdc/CDC-01-identite-acces.md`) | Backend en cours de finalisation et de recette ; interfaces web à construire |
 | 2    | Cycle de vie client                 | `customer-service`     | À faire                                                                         | —                                                                   |
 | 3    | Référentiel partenaires et méthodes | `partner-service`      | À faire                                                                         | —                                                                   |
 | 4    | Configuration des intégrations      | `partner-service`      | À faire                                                                         | —                                                                   |
@@ -37,7 +37,7 @@ Les documents sont dans `docs/`. En cas de conflit, l'ordre de priorité est le 
 4. **Le référentiel v0.3** (`docs/KG Pay – Core Business Version-0.3.md`), pour la vision, le vocabulaire, les règles RP et les diagrammes.
 5. Les versions v0.1 et v0.2 : **historique uniquement**, ne pas les utiliser pour décider.
 
-Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration et des branches de travail dérivées de `dev`. Le workspace pnpm/Turborepo est en place. `auth-service` est en cours de bootstrap ; aucun parcours métier d'identité ni frontend applicatif n'est encore livré. Aucun remote GitHub n'est configuré.
+Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration et des branches de travail dérivées de `dev`. Le workspace pnpm/Turborepo est en place. Le backend du CDC-01 est en cours de finalisation sur une branche dédiée ; le frontend applicatif n'est pas encore livré. Aucun remote GitHub n'est configuré.
 
 Le template de dossier est mentionné dans des documents existants, mais aucun fichier de template n'est présent dans `docs/` à la date de cette revue. Ne pas supposer qu'il existe ; le créer ou corriger les références avant de l'utiliser.
 
@@ -66,7 +66,7 @@ kgpay/
 ├── env/global.env   # variables non secrètes partagées AU BUILD
 ├── packages/        # @kgpay/config, contracts, common, auth-guard, testing
 ├── services/        # un dossier par microservice
-└── scripts/         # build-env.ts, etc.
+└── scripts/         # build-env.cjs, etc.
 ```
 
 ## 4. Règles impératives pour l'IA
@@ -117,11 +117,12 @@ Issus du référentiel v0.3 (§2, §6.1, règles RP) :
 
 ## 7. Variables d'environnement
 
-- `env/global.env` : variables **non secrètes** communes ; copiées dans un service **uniquement au build**, et seulement celles qu'il déclare dans `sharedKeys` (`env.schema.ts`).
+- `env/global.env` : variables **non secrètes** communes ; copiées dans un service **uniquement au build**, et seulement celles qu'il déclare dans `sharedKeys` (`env.schema.json`).
 - `services/<service>/service.env` : variables propres non secrètes.
 - **Secrets** : injectés au déploiement ou via `.env.local` (ignoré par Git).
 - Au démarrage, un service valide sa configuration (`@kgpay/config`) et **refuse de démarrer** si elle est invalide.
 - À l'exécution, un service ne lit jamais `env/global.env`.
+- Pour `auth-service`, `pnpm env:build` produit `services/auth-service/build.env` depuis les clés autorisées de `global.env` et `service.env`. Le build du service copie automatiquement ce fichier dans `dist`; les secrets ne sont ni lus ni copiés par le générateur. L'application charge le fichier généré et les secrets injectés au runtime.
 
 ## 8. Commandes disponibles et cibles
 
@@ -136,7 +137,7 @@ pnpm run test
 pnpm --filter auth-service test:e2e
 ```
 
-`pnpm env:build` et les vérifications de dépendances inter-packages restent indisponibles : leurs scripts et packages n'existent pas encore.
+`pnpm env:build` génère les variables non secrètes de build d'`auth-service`. Les secrets restent injectés via `.env.local` ignoré par Git en développement ou par le gestionnaire de secrets au déploiement.
 
 ## 9. Workflow d'un cœur métier
 

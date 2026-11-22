@@ -2,6 +2,7 @@ import { Module, type OnApplicationShutdown } from '@nestjs/common';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { EMAIL_FROM_ADDRESS, EMAIL_TRANSPORT } from './email-otp.tokens';
 import { EmailOtpService } from './email-otp.service';
+import { InvitationEmailService } from './invitation-email.service';
 import { readSmtpConfig } from './smtp.config';
 
 class SmtpTransportLifecycle implements OnApplicationShutdown {
@@ -44,7 +45,8 @@ class SmtpTransportLifecycle implements OnApplicationShutdown {
         new SmtpTransportLifecycle(transport),
     },
     EmailOtpService,
+    InvitationEmailService,
   ],
-  exports: [EmailOtpService],
+  exports: [EmailOtpService, InvitationEmailService],
 })
 export class EmailOtpModule {}

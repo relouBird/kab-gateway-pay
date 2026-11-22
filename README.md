@@ -1,6 +1,6 @@
 # KG Pay — Guide développeur
 
-> **État au 21 novembre 2026 :** le dépôt Git local et le workspace pnpm/Turborepo sont initialisés (`main` → `dev` → branches de travail), sans remote GitHub. `services/auth-service` est en cours de bootstrap et expose uniquement `GET /health` ; aucun parcours métier d'identité ni frontend KG Pay n'est encore livré.
+> **État au 22 novembre 2026 :** le workspace pnpm/Turborepo est initialisé (`main` → `dev` → branches de travail), sans remote GitHub. Le backend du cœur 1 est en cours d'implémentation sur une branche dédiée ; le frontend KG Pay n'est pas encore créé.
 
 ## Démarrage d'une nouvelle tâche
 
@@ -15,7 +15,7 @@ Le CDC d'un cœur couvre ses exigences frontend **et** backend. Ne pas créer un
 
 ## État de la base applicative
 
-- `services/auth-service` expose `GET /health` et contient désormais le transport SMTP et les modèles e-mail bilingues pour OTP ; la persistance, la validation MFA, les sessions et les autres flux d'authentification ne sont pas encore livrés. Le frontend KG Pay reste à construire.
+- `services/auth-service` implémente les parcours backend du CDC-01 : OTP e-mail obligatoire, rôles, sessions, administration, audit, outbox, Swagger et persistance PostgreSQL/Prisma. Les validations de fin et la recette sont documentées dans le journal ; le frontend KG Pay reste à construire.
 - `nexus-gate-web` est un exemple séparé de frontend avec des pages d'authentification, Yup, Zustand et Axios. Il sert de référence de conventions, pas de backend, de contrat API ou de modèle d'identité à recopier.
 - Le CDC-01 exige un OTP par e-mail après le mot de passe, à chaque nouvelle connexion, pour `CUSTOMER` comme pour `STAFF`. La boîte e-mail devient un facteur de sécurité critique ; cette solution est moins indépendante qu'un authenticator.
 - Seul l'e-mail est un identifiant vérifié. Le téléphone est conservé comme moyen de contact non vérifié, sans login, OTP SMS ni récupération de compte.
@@ -43,6 +43,7 @@ Commandes de validation disponibles :
 
 ```bash
 pnpm install
+pnpm env:build
 pnpm run build
 pnpm run lint
 pnpm run typecheck
@@ -50,7 +51,7 @@ pnpm run test
 pnpm --filter auth-service test:e2e
 ```
 
-La configuration racine déclare Node.js `>=22.20.0` et pnpm `10.28.2` ; les versions résolues sont verrouillées dans `pnpm-lock.yaml`. Les commandes de démarrage, migrations et déploiement seront documentées à mesure qu'elles seront réellement configurées.
+La configuration racine déclare Node.js `>=22.20.0` et pnpm `10.28.2` ; les versions résolues sont verrouillées dans `pnpm-lock.yaml`. Les commandes locales, migrations et essais Swagger d'`auth-service` sont documentés dans [son README](./services/auth-service/README.md).
 
 ## Git, hooks et validation
 
@@ -70,9 +71,9 @@ La configuration racine déclare Node.js `>=22.20.0` et pnpm `10.28.2` ; les ver
 ## Séquence de création recommandée
 
 1. Initialiser Git, `main`/`dev`, le workspace pnpm/Turborepo et le hook local.
-2. Construire le socle `auth-service` et implémenter l'OTP e-mail pour `CUSTOMER` et `STAFF`.
-3. Implémenter les rôles intégrés, les rôles personnalisés limités au catalogue de permissions et les contrôles d'administration validés dans le CDC-01.
-4. Compléter les parcours backend du CDC-01 ; conserver les interfaces comme exigences du CDC, mais hors de cette tranche backend.
+2. Terminer l'implémentation et la recette du backend `auth-service` conformément au CDC-01, en gardant visibles ses points ouverts.
+3. Implémenter les interfaces client/personnel du CDC-01 dans le(s) frontend(s) à valider.
+4. Construire les cœurs suivants après validation de leurs CDC ; ne pas assimiler l'identité authentifiée au statut du dossier client.
 5. Vérifier la compatibilité réelle de l'hébergement cible avant d'établir les instructions de déploiement.
 
 Les points ouverts bloquent les fonctionnalités qui en dépendent, mais pas le socle extensible. Aucun parcours authentifié ne sera implémenté sans MFA vérifié.
