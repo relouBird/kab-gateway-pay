@@ -74,7 +74,7 @@ describeMaildev('Auth API (real SMTP through Maildev)', () => {
 
     const recipient = createRecipient();
     const api = request(app.getHttpServer());
-    const password = 'Test-Only-Maildev-Password-2026!';
+    const password = createTestPassword();
     const registration = await api
       .post('/auth/register')
       .send({
@@ -149,12 +149,13 @@ describeMaildev('Auth API (real SMTP through Maildev)', () => {
       recipient,
       /reset your password|réinitialiser votre mot de passe/i,
     );
+    const newPassword = createTestPassword();
     await api
       .post('/auth/password/reset')
       .send({
         challengeId: recovery.body.challengeId,
         code: recoveryCode,
-        newPassword: 'Test-Only-Maildev-Reset-2026!',
+        newPassword,
       })
       .expect(204);
   }, 30_000);
@@ -167,7 +168,7 @@ describeMaildev('Auth API (real SMTP through Maildev)', () => {
     const api = request(app.getHttpServer());
     const auth = app.get(AuthService);
     const adminEmail = createRecipient();
-    const adminPassword = 'Test-Only-Maildev-Admin-2026!';
+    const adminPassword = createTestPassword();
     const bootstrap = await auth.bootstrapSuperAdmin({
       email: adminEmail,
       phone: '+237600000008',
@@ -217,7 +218,7 @@ describeMaildev('Auth API (real SMTP through Maildev)', () => {
       .expect(200);
 
     const staffEmail = createRecipient();
-    const staffPassword = 'Test-Only-Maildev-Staff-2026!';
+    const staffPassword = createTestPassword();
     await api
       .post('/admin/identities')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -263,6 +264,10 @@ function createRecipient(): string {
   const recipient = `auth-maildev-${randomUUID()}@example.test`;
   recipients.push(recipient);
   return recipient;
+}
+
+function createTestPassword(): string {
+  return randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
 }
 
 class MaildevMcpClient {
