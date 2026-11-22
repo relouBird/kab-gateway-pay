@@ -9,10 +9,10 @@
 - Travailler progressivement, cœur par cœur. Le premier cœur est **Cœur 1 — Identité et contrôle des accès** (`auth-service`, `CDC-01`).
 - Lire le README développeur à la racine, puis les documents requis ci-dessous avant toute tâche. Respecter les consignes plus spécifiques éventuellement présentes dans des `AGENTS.md` imbriqués.
 
-## 2. État réel du projet au 21 novembre 2026
+## 2. État réel du projet au 22 novembre 2026
 
-- Le dépôt Git local et le workspace pnpm/Turborepo sont initialisés ; `main` est la branche principale, `dev` la branche d'intégration, et les branches de travail partent de `dev`. Aucun remote GitHub n'est configuré.
-- `services/auth-service` est en cours de bootstrap ; il ne porte encore aucun parcours métier d'identité. Le frontend KG Pay, la CI et le déploiement ne sont pas créés.
+- Le dépôt Git local, le remote `origin` et le workspace pnpm/Turborepo sont initialisés ; `main` est la branche principale, `dev` la branche d'intégration, et les branches de travail partent de `dev`.
+- `services/auth-service` implémente les parcours backend du CDC-01. Les tests unitaires existent ; la recette avec base de données, SMTP et parcours HTTP complets reste à exécuter. Le frontend KG Pay, la CI et le déploiement ne sont pas créés.
 - Le CDC-01 est validé comme base V1 avec ses points ouverts conservés. Un OTP par e-mail après le mot de passe est confirmé pour `CUSTOMER` et `STAFF` à chaque nouvelle connexion. L'envoi de développement passe par SMTP configurable (Maildev) ; la disponibilité/sécurité de la boîte e-mail est un risque résiduel. Les paramètres OTP et la récupération restent à préciser.
 - `nexus-gate-web` est la seule référence frontend/auth fournie. C'est un projet distinct avec son propre contexte : ses appels, rôles, parcours d'équipe/`CREATOR` et choix de sécurité ne sont pas les contrats de KG Pay.
 - `master/` contient des références PDF/Word administratives : **ne pas l'explorer ni s'en servir comme source** sauf demande explicite du porteur du projet.
@@ -56,7 +56,7 @@ Respecter les invariants du README documentaire, en particulier :
 
 Sécurité générale :
 
-- Ne jamais ajouter de secret aux fichiers versionnés, exemples, journaux, événements, captures, commits ou messages d'erreur.
+- Ne jamais ajouter de secret aux fichiers versionnés, exemples, journaux, événements, captures, commits ou messages d'erreur. Le `.env` racine local est ignoré par Git ; ne jamais le committer.
 - Ne jamais journaliser mots de passe, OTP/MFA, cookies, tokens, objets de requête Axios complets ou données personnelles/financières non nécessaires.
 - Le frontend n'est jamais une frontière d'autorisation : le backend contrôle identité, permissions, propriété de ressource et règles métier.
 - Les services n'accèdent pas aux bases des autres services ; aucun import d'un service vers un autre.

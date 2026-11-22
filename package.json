@@ -8,11 +8,13 @@
   },
   "scripts": {
     "prepare": "husky",
-    "env:build": "node scripts/build-env.cjs",
-    "build": "pnpm env:build && turbo run build",
+    "env:build": "node scripts/generate-env.cjs --mode build",
+    "env:runtime": "node scripts/generate-env.cjs --mode runtime",
+    "build": "turbo run build",
+    "dev": "turbo run dev",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test"
+    "test": "node --test scripts/generate-env.test.cjs && turbo run test"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

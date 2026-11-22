@@ -37,7 +37,7 @@ Les documents sont dans `docs/`. En cas de conflit, l'ordre de priorité est le 
 4. **Le référentiel v0.3** (`docs/KG Pay – Core Business Version-0.3.md`), pour la vision, le vocabulaire, les règles RP et les diagrammes.
 5. Les versions v0.1 et v0.2 : **historique uniquement**, ne pas les utiliser pour décider.
 
-Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration et des branches de travail dérivées de `dev`. Le workspace pnpm/Turborepo est en place. Le backend du CDC-01 est en cours de finalisation sur une branche dédiée ; le frontend applicatif n'est pas encore livré. Aucun remote GitHub n'est configuré.
+Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration et des branches de travail dérivées de `dev`. Le workspace pnpm/Turborepo et le remote `origin` sont en place. `auth-service` implémente les parcours backend du CDC-01 ; les tests unitaires existent, mais la recette avec base de données, SMTP et parcours HTTP complets reste à exécuter. Le frontend applicatif n'est pas encore livré.
 
 Le template de dossier est mentionné dans des documents existants, mais aucun fichier de template n'est présent dans `docs/` à la date de cette revue. Ne pas supposer qu'il existe ; le créer ou corriger les références avant de l'utiliser.
 
@@ -63,10 +63,12 @@ Détails et justifications : `docs/architecture/ADR-001-monorepo-microservices.m
 kgpay/
 ├── docs/            # référentiels, ADR, CDC (template à créer)
 ├── apps/            # applications web (cible proposée dans ADR-002)
-├── env/global.env   # variables non secrètes partagées AU BUILD
+├── .env             # source locale unique, ignorée par Git
+├── .env.example     # modèle versionné sans secrets
+├── .generated/env/  # sorties générées et ignorées, par workspace et usage
 ├── packages/        # @kgpay/config, contracts, common, auth-guard, testing
 ├── services/        # un dossier par microservice
-└── scripts/         # build-env.cjs, etc.
+└── scripts/         # generate-env.cjs, etc.
 ```
 
 ## 4. Règles impératives pour l'IA
@@ -84,7 +86,7 @@ kgpay/
 
 - Ne pas inventer d'endpoint, de règle, de valeur chiffrée ou de décision absents des documents. Les valeurs par défaut des CDC sont des propositions configurables.
 - Ne pas créer d'`api-gateway`, de base partagée entre services, ni d'import d'un service vers un autre.
-- Ne pas mettre de secret dans `global.env`, `service.env`, les journaux, les événements ou les messages d'erreur.
+- Ne jamais committer de secret dans `.env.example`, les journaux, les événements ou les messages d'erreur. Le `.env` racine local est ignoré ; ses sorties runtime générées le sont également.
 - Ne pas contourner les invariants métier de la section 5, même « temporairement ».
 - Ne pas supposer qu'une fonctionnalité décrite est implémentée : vérifier le code.
 
@@ -117,12 +119,17 @@ Issus du référentiel v0.3 (§2, §6.1, règles RP) :
 
 ## 7. Variables d'environnement
 
-- `env/global.env` : variables **non secrètes** communes ; copiées dans un service **uniquement au build**, et seulement celles qu'il déclare dans `sharedKeys` (`env.schema.json`).
-- `services/<service>/service.env` : variables propres non secrètes.
-- **Secrets** : injectés au déploiement ou via `.env.local` (ignoré par Git).
-- Au démarrage, un service valide sa configuration (`@kgpay/config`) et **refuse de démarrer** si elle est invalide.
-- À l'exécution, un service ne lit jamais `env/global.env`.
-- Pour `auth-service`, `pnpm env:build` produit `services/auth-service/build.env` depuis les clés autorisées de `global.env` et `service.env`. Le build du service copie automatiquement ce fichier dans `dist`; les secrets ne sont ni lus ni copiés par le générateur. L'application charge le fichier généré et les secrets injectés au runtime.
+Le dépôt maintient une seule source locale éditable : `.env` à la racine. Elle est ignorée par Git et n'est jamais chargée directement par un service. `.env.example` décrit les noms attendus sans contenir de secrets ; le `.env` réel doit être fourni localement ou injecté de manière sécurisée sur l'hôte de déploiement.
+
+Les clés communes prennent la forme `GLOBAL__<KEY>` ; les clés propres à un workspace utilisent un suffixe qui identifie leur cible (par exemple `DATABASE_URL__AUTH_SERVICE`, `VITE_AUTH_API_URL__CUSTOMER_PORTAL`). Le générateur retire ce préfixe/suffixe pour écrire le nom que le code cible attend. Un `env.schema.json` conserve `properties`, `requiredKeys` et `sharedKeys`, et déclare aussi `targetPrefix`, `runtimeOnlyKeys` et `runtimeRequiredKeys`.
+
+Les sorties sont centralisées et ignorées dans `.generated/env/`, à la racine du dépôt :
+
+- `.generated/env/auth-service.build.env` contient uniquement les variables autorisées au build ; aucune URL de base, clé privée, clé HMAC ou credential SMTP n'y est copiée.
+- `.generated/env/auth-service.runtime.env` contient la configuration runtime nécessaire à `auth-service`, secrets inclus. Il est lu au démarrage ou par les commandes Prisma, n'est pas copié dans `dist` et ne doit pas être publié.
+- Lorsqu'une future application ou un futur service déclare son `env.schema.json`, le générateur produit les mêmes fichiers avec son nom de workspace (`<workspace>.build.env` et `<workspace>.runtime.env`). Les packages partagés n'ont pas d'environnement par défaut ; leur configuration leur est passée par le consommateur.
+
+`pnpm env:build` et `pnpm env:runtime` génèrent les sorties de tous les workspaces déclarant un schéma. Les tâches Turbo `build` et `dev` les déclenchent avant leur orchestration ; les scripts ciblés d'un workspace régénèrent aussi ses fichiers lorsqu'il est démarré ou buildé seul. Les variables déjà injectées dans le processus gardent la priorité sur les valeurs du `.env`.
 
 ## 8. Commandes disponibles et cibles
 
@@ -130,6 +137,9 @@ Commandes de validation actuellement disponibles :
 
 ```bash
 pnpm install
+pnpm env:build
+pnpm env:runtime
+pnpm dev
 pnpm run build
 pnpm run lint
 pnpm run typecheck
@@ -137,7 +147,7 @@ pnpm run test
 pnpm --filter auth-service test:e2e
 ```
 
-`pnpm env:build` génère les variables non secrètes de build d'`auth-service`. Les secrets restent injectés via `.env.local` ignoré par Git en développement ou par le gestionnaire de secrets au déploiement.
+Pour `auth-service`, copier `.env.example` vers `.env`, renseigner l'URL PostgreSQL et les clés runtime, puis démarrer avec `pnpm --filter auth-service start:dev`. Le générateur ciblé est également exécuté automatiquement par les commandes de démarrage et de migration du service.
 
 ## 9. Workflow d'un cœur métier
 

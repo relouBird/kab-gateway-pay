@@ -38,5 +38,5 @@ writeFileSync(
 );
 
 process.stdout.write(
-  `Signing and HMAC keys created in ${outputDirectory}.\nSet JWT_PRIVATE_KEY_FILE to the private key path, JWT_KEY_ID=${keyId}, OTP_HASH_KEY to the contents of otp-hash.key, and IP_HASH_KEY to the contents of ip-hash.key in your runtime environment.\n`,
+  `Signing and HMAC keys created in ${outputDirectory}.\nSet JWT_PRIVATE_KEY_FILE__AUTH_SERVICE to the private key path, JWT_KEY_ID__AUTH_SERVICE=${keyId}, OTP_HASH_KEY__AUTH_SERVICE to the contents of otp-hash.key, and IP_HASH_KEY__AUTH_SERVICE to the contents of ip-hash.key in the repository-root .env.\n`,
 );
