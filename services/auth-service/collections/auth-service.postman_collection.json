@@ -1,0 +1,2027 @@
+{
+  "info": {
+    "name": "KG Pay — auth-service",
+    "description": "Collection générée depuis le contrat OpenAPI exposé par auth-service.\n\nInventaire : 38 opérations.\n\nDécouverte complète et schémas détaillés : GET {{baseUrl}}/docs-json ; interface interactive : {{baseUrl}}/docs (hors production).\n\nParcours CUSTOMER : renseigner email/password/phone, appeler register, relever le code dans Maildev, renseigner otpCode puis verify-contact ; login et OTP ; mfa/verify enregistre accessToken et sessionId automatiquement.\n\nPour refresh/logout par cookie, utiliser le cookie jar Postman et appeler GET /auth/csrf ; la variable csrfToken est enregistrée automatiquement. Après un refresh, rappeler GET /auth/csrf avant logout.\n\nPour une opération protégée par step-up, appeler POST /auth/step-up avec stepUpAction, relever l’OTP par e-mail, puis compléter challengeId/code dans la requête step-up afin que la réponse enregistre stepUpProof.\n\nLes variables contenant des identifiants, mots de passe, codes, preuves ou tokens sont vides par défaut. Ne pas partager les valeurs locales et ne pas utiliser de vrais secrets dans la collection.\n\nLes valeurs de réponse sensibles sont enregistrées dans l’environnement Postman actif ; sélectionner un environnement local non partagé avant les requêtes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "description": "OpenAPI operationId: HealthController_getHealth",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "query": []
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "description": "Create a CUSTOMER identity and send an email verification code\n\nOpenAPI operationId: AuthController_register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"phone\": \"{{phone}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/verify-contact",
+          "description": "Verify an email address with its one-time code\n\nOpenAPI operationId: AuthController_verifyContact",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-contact",
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"code\": \"{{otpCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/otp/resend",
+          "description": "OpenAPI operationId: AuthController_resend",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/otp/resend",
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challengeId\": \"{{challengeId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login",
+          "description": "Validate password and send the mandatory email OTP\n\nOpenAPI operationId: AuthController_login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/mfa/verify",
+          "description": "Complete login by verifying the email OTP\n\nOpenAPI operationId: AuthController_verifyLogin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/mfa/verify",
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"code\": \"{{otpCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/password/forgot",
+          "description": "OpenAPI operationId: AuthController_forgotPassword",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/password/forgot",
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/password/reset",
+          "description": "OpenAPI operationId: AuthController_resetPassword",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/password/reset",
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"code\": \"{{otpCode}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/password/change",
+          "description": "OpenAPI operationId: AuthController_changePassword",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/password/change",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{currentPassword}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/invitations/accept",
+          "description": "OpenAPI operationId: AuthController_acceptInvitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/invitations/accept",
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{invitationToken}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/step-up",
+          "description": "Request an email OTP or exchange its verification for a short proof\n\nOpenAPI operationId: AuthController_stepUp",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/step-up",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"{{stepUpAction}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/email/change",
+          "description": "OpenAPI operationId: AuthController_requestEmailChange\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/email/change",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newEmail\": \"{{newEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/email/change/verify",
+          "description": "OpenAPI operationId: AuthController_verifyEmailChange",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/email/change/verify",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newEmail\": \"{{newEmail}}\",\n  \"code\": \"{{otpCode}}\",\n  \"challengeId\": \"{{challengeId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/contact/phone",
+          "description": "OpenAPI operationId: AuthController_changePhoneContact\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/contact/phone",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/csrf",
+          "description": "Return the CSRF token for Swagger cookie-based calls\n\nOpenAPI operationId: AuthController_getCsrfToken",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/csrf",
+              "query": []
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/refresh",
+          "description": "Use the refresh cookie with its matching CSRF cookie and header, or provide refreshToken in the request body.\n\nOpenAPI operationId: AuthController_refresh\n\nLe cookie kgpay_refresh est conserv? par le cookie jar Postman apr?s MFA/refresh. Ex?cuter GET /auth/csrf pour obtenir ou renouveler csrfToken avant cet appel.\n\nLe corps est facultatif ; le mod?le {} privil?gie le flux par cookies.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout",
+          "description": "Use the refresh cookie with its matching CSRF cookie and header, or provide refreshToken in the request body.\n\nOpenAPI operationId: AuthController_logout\n\nLe cookie kgpay_refresh est conserv? par le cookie jar Postman apr?s MFA/refresh. Ex?cuter GET /auth/csrf pour obtenir ou renouveler csrfToken avant cet appel.\n\nLe corps est facultatif ; le mod?le {} privil?gie le flux par cookies.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout-all",
+          "description": "OpenAPI operationId: AuthController_logoutAll",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout-all",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/sessions",
+          "description": "OpenAPI operationId: AuthController_sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/sessions",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /auth/sessions/{sessionId}",
+          "description": "OpenAPI operationId: AuthController_revokeSession",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/sessions/{{sessionId}}",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Administration",
+      "item": [
+        {
+          "name": "GET /admin/identities",
+          "description": "OpenAPI operationId: AdminController_listIdentities\n\nLes filtres facultatifs sont d?sactiv?s dans Postman par d?faut.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities",
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "description": "Param?tre facultatif",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "description": "Param?tre facultatif",
+                  "disabled": false
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "description": "Param?tre facultatif",
+                  "disabled": true
+                },
+                {
+                  "key": "subjectType",
+                  "value": "{{subjectType}}",
+                  "description": "Param?tre facultatif",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "description": "Param?tre facultatif",
+                  "disabled": true
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/identities",
+          "description": "Invite a STAFF identity; CUSTOMER self-registration is separate\n\nOpenAPI operationId: AdminController_createIdentity\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"phone\": \"{{phone}}\",\n  \"roles\": [\n    \"{{roleCode}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/identities/{identityId}/invitation/resend",
+          "description": "OpenAPI operationId: AdminController_resendInvitation\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities/{{identityId}}/invitation/resend",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/identities/{identityId}/suspend",
+          "description": "OpenAPI operationId: AdminController_suspend\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities/{{identityId}}/suspend",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/identities/{identityId}/reactivate",
+          "description": "OpenAPI operationId: AdminController_reactivate\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities/{{identityId}}/reactivate",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/identities/{identityId}/disable",
+          "description": "OpenAPI operationId: AdminController_disable\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities/{{identityId}}/disable",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/identities/{identityId}/unlock",
+          "description": "OpenAPI operationId: AdminController_unlock\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities/{{identityId}}/unlock",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/identities/{identityId}/roles",
+          "description": "OpenAPI operationId: AdminController_assignRole\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities/{{identityId}}/roles",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleCode\": \"{{roleCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/identities/{identityId}/roles/revoke",
+          "description": "OpenAPI operationId: AdminController_revokeRole\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities/{{identityId}}/roles/revoke",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleCode\": \"{{roleCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/roles",
+          "description": "OpenAPI operationId: AdminController_listRoles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/roles",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/roles",
+          "description": "OpenAPI operationId: AdminController_createRole\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/roles",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{roleCode}}\",\n  \"name\": \"{{roleName}}\",\n  \"permissions\": [\n    \"{{permission}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/access-events",
+          "description": "OpenAPI operationId: AdminController_listAccessEvents\n\nLes filtres facultatifs sont d?sactiv?s dans Postman par d?faut.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/access-events",
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "description": "Param?tre facultatif",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "description": "Param?tre facultatif",
+                  "disabled": false
+                },
+                {
+                  "key": "identityId",
+                  "value": "{{identityId}}",
+                  "description": "Param?tre facultatif",
+                  "disabled": true
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/access-review",
+          "description": "OpenAPI operationId: AdminController_accessReview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/access-review",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/identities/{identityId}/sessions/{sessionId}/revoke",
+          "description": "OpenAPI operationId: AdminController_revokeSession\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities/{{identityId}}/sessions/{{sessionId}}/revoke",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/identities/{identityId}/email-recovery",
+          "description": "OpenAPI operationId: AdminController_recoverStaffEmail\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities/{{identityId}}/email-recovery",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newEmail\": \"{{newEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/identities/{identityId}/email-recovery/verify",
+          "description": "OpenAPI operationId: AdminController_verifyStaffEmailRecovery\n\nCette op?ration exige une preuve step-up r?cente, li?e ? la session et ? la cat?gorie d?action.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Step-Up-Proof",
+                "value": "{{stepUpProof}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/identities/{{identityId}}/email-recovery/verify",
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newEmail\": \"{{newEmail}}\",\n  \"code\": \"{{otpCode}}\",\n  \"challengeId\": \"{{challengeId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Service-to-service",
+      "item": [
+        {
+          "name": "POST /internal/introspect",
+          "description": "Introspect current session state for an authorized service\n\nOpenAPI operationId: InternalController_introspect\n\nRenseigner les identifiants de service autoris?s dans les variables locales Postman.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Service-Client",
+                "value": "{{serviceClient}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Service-Secret",
+                "value": "{{serviceSecret}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internal/introspect",
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{sessionId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "JWKS",
+      "item": [
+        {
+          "name": "GET /.well-known/jwks.json",
+          "description": "OpenAPI operationId: JwksController_jwks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/.well-known/jwks.json",
+              "query": []
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const contentType = pm.response.headers.get('Content-Type') || '';",
+                  "if (contentType.includes('application/json')) {",
+                  "  const data = pm.response.json();",
+                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
+                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "newEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "newPassword",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "phone",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "locale",
+      "value": "en",
+      "type": "string"
+    },
+    {
+      "key": "challengeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "otpCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "invitationToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sessionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "identityId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "roleCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "permission",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "stepUpAction",
+      "value": "iam.identity.phone-change",
+      "type": "string"
+    },
+    {
+      "key": "stepUpProof",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "csrfToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "serviceClient",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "serviceSecret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "page",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "limit",
+      "value": "20",
+      "type": "string"
+    },
+    {
+      "key": "search",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subjectType",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "status",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "currentPassword",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "roleName",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

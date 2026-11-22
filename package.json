@@ -31,7 +31,8 @@
     "test:auth-service:watch": "pnpm --filter auth-service test:watch",
     "test:auth-service:coverage": "pnpm --filter auth-service test:cov",
     "test:auth-service:debug": "pnpm --filter auth-service test:debug",
-    "test:e2e:auth-service": "pnpm --filter auth-service test:e2e"
+    "test:e2e:auth-service": "pnpm --filter auth-service test:e2e",
+    "test:e2e:auth-service:isolated": "node scripts/run-auth-service-e2e.cjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

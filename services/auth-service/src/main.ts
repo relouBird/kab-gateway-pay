@@ -10,6 +10,7 @@ import { AUTH_CONFIG } from './config/auth.config';
 import { loadRuntimeEnvironment } from './config/runtime-env';
 import type { AuthConfig } from './config/auth.config';
 import { AppModule } from './app.module';
+import { normalizeOpenApiSecurity } from './common/openapi-security';
 
 async function bootstrap() {
   loadRuntimeEnvironment();
@@ -76,11 +77,9 @@ async function bootstrap() {
     )
     .build();
   if (process.env.NODE_ENV !== 'production') {
-    SwaggerModule.setup(
-      'docs',
-      app,
-      SwaggerModule.createDocument(app, swaggerConfig),
-    );
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    normalizeOpenApiSecurity(document.paths);
+    SwaggerModule.setup('docs', app, document);
   }
   app.enableShutdownHooks();
   const port = Number(process.env.PORT);

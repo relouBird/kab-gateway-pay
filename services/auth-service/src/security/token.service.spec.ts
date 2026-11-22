@@ -64,6 +64,23 @@ describe('TokenService', () => {
     ]);
   });
 
+  it('accepts an empty optional previous-key configuration', () => {
+    process.env.AUTH_SIGNING_PUBLIC_KEYS_JSON = '  ';
+    tokens = new TokenService(new PrismaService(), validAuthConfig());
+
+    expect(tokens.getJwks().keys.map(({ kid }) => kid)).toEqual([
+      'current-key',
+    ]);
+  });
+
+  it('rejects malformed non-empty previous-key configuration', () => {
+    process.env.AUTH_SIGNING_PUBLIC_KEYS_JSON = '{';
+
+    expect(
+      () => new TokenService(new PrismaService(), validAuthConfig()),
+    ).toThrow('AUTH_SIGNING_PUBLIC_KEYS_JSON must be a JSON array.');
+  });
+
   it('verifies tokens signed by a previous public key during rotation overlap', () => {
     const previousKeyPair = generateKeyPairSync('rsa', {
       modulusLength: 2048,

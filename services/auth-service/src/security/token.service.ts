@@ -83,10 +83,12 @@ export class TokenService {
     this.keyId = keyId;
     this.publicKeys.set(keyId, createPublicKey(this.signingKey));
 
-    const rawAdditionalKeys = process.env.AUTH_SIGNING_PUBLIC_KEYS_JSON ?? '[]';
+    const rawAdditionalKeys = process.env.AUTH_SIGNING_PUBLIC_KEYS_JSON?.trim();
     let additionalKeys: AdditionalPublicKey[];
     try {
-      additionalKeys = JSON.parse(rawAdditionalKeys) as AdditionalPublicKey[];
+      additionalKeys = rawAdditionalKeys
+        ? (JSON.parse(rawAdditionalKeys) as AdditionalPublicKey[])
+        : [];
     } catch {
       throw new Error('AUTH_SIGNING_PUBLIC_KEYS_JSON must be a JSON array.');
     }

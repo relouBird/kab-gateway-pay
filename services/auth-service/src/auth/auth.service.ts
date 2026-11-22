@@ -195,7 +195,7 @@ export class AuthService {
     const now = new Date();
     const activated = await this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${consumed.identityId}))
+        SELECT pg_advisory_xact_lock(hashtext(${consumed.identityId}))::text
       `;
       const identity = await transaction.identity.findUniqueOrThrow({
         where: { id: consumed.identityId },
@@ -279,7 +279,7 @@ export class AuthService {
     const identityId = await this.prisma.$transaction(
       async (transaction) => {
         await transaction.$queryRaw`
-          SELECT pg_advisory_xact_lock(hashtext('kgpay-global-admin-invariant'))
+          SELECT pg_advisory_xact_lock(hashtext('kgpay-global-admin-invariant'))::text
         `;
         const existingBootstrap = await transaction.systemSetting.findUnique({
           where: { key: 'INITIAL_SUPER_ADMIN' },
@@ -432,7 +432,7 @@ export class AuthService {
     const accepted = await this.prisma.$transaction(
       async (transaction) => {
         await transaction.$queryRaw`
-          SELECT pg_advisory_xact_lock(hashtext(${identity.id}))
+          SELECT pg_advisory_xact_lock(hashtext(${identity.id}))::text
         `;
         const current = await transaction.identity.findUniqueOrThrow({
           where: { id: identity.id },
@@ -499,7 +499,7 @@ export class AuthService {
     return this.prisma.$transaction(
       async (transaction) => {
         await transaction.$queryRaw`
-          SELECT pg_advisory_xact_lock(hashtext(${consumed.identityId}))
+          SELECT pg_advisory_xact_lock(hashtext(${consumed.identityId}))::text
         `;
         const identity = await transaction.identity.findUniqueOrThrow({
           where: { id: consumed.identityId },
@@ -611,7 +611,7 @@ export class AuthService {
     const now = new Date();
     await this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${consumed.identityId}))
+        SELECT pg_advisory_xact_lock(hashtext(${consumed.identityId}))::text
       `;
       const current = await transaction.identity.findUniqueOrThrow({
         where: { id: consumed.identityId },
@@ -685,7 +685,7 @@ export class AuthService {
     const now = new Date();
     await this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${auth.identityId}))
+        SELECT pg_advisory_xact_lock(hashtext(${auth.identityId}))::text
       `;
       const current = await transaction.identity.findUniqueOrThrow({
         where: { id: auth.identityId },
@@ -753,7 +753,7 @@ export class AuthService {
     const now = new Date();
     await this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${invitation.identityId}))
+        SELECT pg_advisory_xact_lock(hashtext(${invitation.identityId}))::text
       `;
       const used = await transaction.invitation.updateMany({
         where: {
@@ -927,7 +927,7 @@ export class AuthService {
     );
     const invitation = await this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${identityId}))
+        SELECT pg_advisory_xact_lock(hashtext(${identityId}))::text
       `;
       const identity = await transaction.identity.findUnique({
         where: { id: identityId },
@@ -1078,11 +1078,11 @@ export class AuthService {
     await this.prisma.$transaction(async (transaction) => {
       if (role.code === 'GLOBAL_SUPER_ADMIN') {
         await transaction.$queryRaw`
-          SELECT pg_advisory_xact_lock(hashtext('kgpay-global-admin-invariant'))
+          SELECT pg_advisory_xact_lock(hashtext('kgpay-global-admin-invariant'))::text
         `;
       }
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${identityId}))
+        SELECT pg_advisory_xact_lock(hashtext(${identityId}))::text
       `;
       const currentIdentity = await transaction.identity.findUnique({
         where: { id: identityId },
@@ -1150,11 +1150,11 @@ export class AuthService {
     await this.prisma.$transaction(async (transaction) => {
       if (role.code === 'GLOBAL_SUPER_ADMIN') {
         await transaction.$queryRaw`
-          SELECT pg_advisory_xact_lock(hashtext('kgpay-global-admin-invariant'))
+          SELECT pg_advisory_xact_lock(hashtext('kgpay-global-admin-invariant'))::text
         `;
       }
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${identityId}))
+        SELECT pg_advisory_xact_lock(hashtext(${identityId}))::text
       `;
       const currentIdentity = await transaction.identity.findUnique({
         where: { id: identityId },
@@ -1225,10 +1225,10 @@ export class AuthService {
 
     return this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext('kgpay-global-admin-invariant'))
+        SELECT pg_advisory_xact_lock(hashtext('kgpay-global-admin-invariant'))::text
       `;
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${identityId}))
+        SELECT pg_advisory_xact_lock(hashtext(${identityId}))::text
       `;
       const identity = await transaction.identity.findUnique({
         where: { id: identityId },
@@ -1661,7 +1661,7 @@ export class AuthService {
           return { state: 'invalid' as const };
         }
         await transaction.$queryRaw`
-          SELECT pg_advisory_xact_lock(hashtext(${tokenOwner.family.identityId}))
+          SELECT pg_advisory_xact_lock(hashtext(${tokenOwner.family.identityId}))::text
         `;
         const token = await transaction.refreshToken.findUnique({
           where: { tokenHash },
@@ -1957,7 +1957,7 @@ export class AuthService {
     try {
       await this.prisma.$transaction(async (transaction) => {
         await transaction.$queryRaw`
-          SELECT pg_advisory_xact_lock(hashtext(${auth.identityId}))
+          SELECT pg_advisory_xact_lock(hashtext(${auth.identityId}))::text
         `;
         const current = await transaction.identity.findUnique({
           where: { id: auth.identityId },
@@ -2033,7 +2033,7 @@ export class AuthService {
     const now = new Date();
     await this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${auth.identityId}))
+        SELECT pg_advisory_xact_lock(hashtext(${auth.identityId}))::text
       `;
       const current = await transaction.identity.findUnique({
         where: { id: auth.identityId },
@@ -2143,7 +2143,7 @@ export class AuthService {
     try {
       await this.prisma.$transaction(async (transaction) => {
         await transaction.$queryRaw`
-          SELECT pg_advisory_xact_lock(hashtext(${identityId}))
+          SELECT pg_advisory_xact_lock(hashtext(${identityId}))::text
         `;
         await transaction.identity.update({
           where: { id: identityId },
@@ -2409,7 +2409,7 @@ export class AuthService {
       async (transaction) => {
         if (identityId) {
           await transaction.$queryRaw`
-          SELECT pg_advisory_xact_lock(hashtext(${identityId}))
+          SELECT pg_advisory_xact_lock(hashtext(${identityId}))::text
         `;
           const identity = await transaction.identity.findUnique({
             where: { id: identityId },
@@ -2494,7 +2494,7 @@ export class AuthService {
     return this.prisma.$transaction(
       async (transaction) => {
         await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${ipHash}))
+        SELECT pg_advisory_xact_lock(hashtext(${ipHash}))::text
       `;
         const current = await transaction.ipLoginAttempt.findUnique({
           where: { ipHash },

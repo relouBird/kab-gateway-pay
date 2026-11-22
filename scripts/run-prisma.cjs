@@ -39,13 +39,17 @@ if (!fs.existsSync(runtimeEnv)) {
 }
 process.loadEnvFile(runtimeEnv);
 
-const command = process.platform === 'win32' ? 'prisma.cmd' : 'prisma';
-const result = spawnSync(command, process.argv.slice(2), {
-  cwd: serviceDir,
-  env: process.env,
-  stdio: 'inherit',
-  shell: process.platform === 'win32',
-});
+const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+const result = spawnSync(
+  pnpmCommand,
+  ['--filter', 'auth-service', 'exec', 'prisma', ...process.argv.slice(2)],
+  {
+    cwd: rootDir,
+    env: process.env,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  },
+);
 
 if (result.error) {
   throw result.error;

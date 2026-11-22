@@ -35,11 +35,30 @@ export class ApiExceptionFilter implements ExceptionFilter {
           : 'Internal server error.';
 
     if (statusCode >= 500) {
+      const errorCode =
+        exception &&
+        typeof exception === 'object' &&
+        'code' in exception &&
+        typeof exception.code === 'string'
+          ? exception.code
+          : undefined;
+      const databaseErrorCode =
+        exception &&
+        typeof exception === 'object' &&
+        'meta' in exception &&
+        exception.meta &&
+        typeof exception.meta === 'object' &&
+        'code' in exception.meta &&
+        typeof exception.meta.code === 'string'
+          ? exception.meta.code
+          : undefined;
       this.logger.error(
         JSON.stringify({
           correlationId: request.correlationId,
           errorType:
             exception instanceof Error ? exception.name : 'UnknownError',
+          ...(errorCode ? { errorCode } : {}),
+          ...(databaseErrorCode ? { databaseErrorCode } : {}),
         }),
       );
     }
