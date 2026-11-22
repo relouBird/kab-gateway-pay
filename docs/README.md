@@ -37,7 +37,12 @@ Les documents sont dans `docs/`. En cas de conflit, l'ordre de priorité est le 
 4. **Le référentiel v0.3** (`docs/KG Pay – Core Business Version-0.3.md`), pour la vision, le vocabulaire, les règles RP et les diagrammes.
 5. Les versions v0.1 et v0.2 : **historique uniquement**, ne pas les utiliser pour décider.
 
-Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration et des branches de travail dérivées de `dev`. Le workspace pnpm/Turborepo et le remote `origin` sont en place. `auth-service` possède des tests unitaires et des parcours HTTP intégrés couvrant l'inscription CUSTOMER, l'OTP e-mail simulé, la connexion MFA, le step-up, les sessions/refresh/logout, la récupération du mot de passe, l'amorçage du super-admin et l'invitation/MFA STAFF sur un schéma PostgreSQL temporaire isolé. Ces essais ne valident pas le transport SMTP réel et ne constituent pas à eux seuls la recette complète du CDC-01 ; les autres scénarios d'administration et de sécurité restent à couvrir. Le frontend applicatif n'est pas encore livré.
+Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration et des branches de
+travail dérivées de `dev`. Le workspace pnpm/Turborepo et le remote `origin` sont en place. `auth-service` possède des
+tests unitaires et des parcours HTTP intégrés CUSTOMER/STAFF sur un schéma PostgreSQL temporaire isolé. Une recette
+supplémentaire valide l'envoi SMTP réel via Maildev/MCP pour les OTP de contact, connexion, récupération et step-up,
+ainsi que l'invitation STAFF. Ces essais ne constituent pas à eux seuls la recette complète du CDC-01 ; les autres
+scénarios d'administration et de sécurité restent à couvrir. Le frontend applicatif n'est pas encore livré.
 
 Le template de dossier est mentionné dans des documents existants, mais aucun fichier de template n'est présent dans `docs/` à la date de cette revue. Ne pas supposer qu'il existe ; le créer ou corriger les références avant de l'utiliser.
 
@@ -146,6 +151,7 @@ pnpm run typecheck
 pnpm run test
 pnpm test:e2e:auth-service
 pnpm test:e2e:auth-service:isolated
+pnpm test:e2e:auth-service:maildev
 pnpm build:auth-service
 pnpm start:auth-service
 pnpm auth:keygen
