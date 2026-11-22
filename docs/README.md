@@ -8,22 +8,22 @@ Plateforme d'agrégation et d'orchestration de paiements : elle centralise plusi
 
 ## 1. État d'avancement
 
-| Cœur | Intitulé | Service | CDC | Code |
-| --- | --- | --- | --- | --- |
-| 1 | Identité et accès | `auth-service` | Brouillon v0.1 (`docs/cdc/CDC-01-identite-acces.md`) | Non démarré |
-| 2 | Cycle de vie client | `customer-service` | À faire | — |
-| 3 | Référentiel partenaires et méthodes | `partner-service` | À faire | — |
-| 4 | Configuration des intégrations | `partner-service` | À faire | — |
-| 5 | Orchestration des paiements | `payment-service` | À faire | — |
-| 6 | Comptes et comptabilité interne | `ledger-service` | À faire | — |
-| 7 | Versements | `payout-service` | À faire | — |
-| 8 | Tarification | `ledger-service` | À faire | — |
-| 9 | Risque et conformité | `risk-service` | À faire | — |
-| 10 | Opérations internes | `ops-service` | À faire | — |
-| 11 | Rapprochement | `ops-service` | À faire | — |
-| 12 | Notifications et reporting | `notification-service` | À faire | — |
-| 13 | Audit et traçabilité | `audit-service` | À faire | — |
-| 14 | Litiges et contestations | `ops-service` | À faire | — |
+| Cœur | Intitulé                            | Service                | CDC                                                                             | Code                                                                |
+| ---- | ----------------------------------- | ---------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 1    | Identité et accès                   | `auth-service`         | Base V1 validée, points ouverts conservés (`docs/cdc/CDC-01-identite-acces.md`) | Squelette avec liveness `GET /health` ; aucun parcours métier livré |
+| 2    | Cycle de vie client                 | `customer-service`     | À faire                                                                         | —                                                                   |
+| 3    | Référentiel partenaires et méthodes | `partner-service`      | À faire                                                                         | —                                                                   |
+| 4    | Configuration des intégrations      | `partner-service`      | À faire                                                                         | —                                                                   |
+| 5    | Orchestration des paiements         | `payment-service`      | À faire                                                                         | —                                                                   |
+| 6    | Comptes et comptabilité interne     | `ledger-service`       | À faire                                                                         | —                                                                   |
+| 7    | Versements                          | `payout-service`       | À faire                                                                         | —                                                                   |
+| 8    | Tarification                        | `ledger-service`       | À faire                                                                         | —                                                                   |
+| 9    | Risque et conformité                | `risk-service`         | À faire                                                                         | —                                                                   |
+| 10   | Opérations internes                 | `ops-service`          | À faire                                                                         | —                                                                   |
+| 11   | Rapprochement                       | `ops-service`          | À faire                                                                         | —                                                                   |
+| 12   | Notifications et reporting          | `notification-service` | À faire                                                                         | —                                                                   |
+| 13   | Audit et traçabilité                | `audit-service`        | À faire                                                                         | —                                                                   |
+| 14   | Litiges et contestations            | `ops-service`          | À faire                                                                         | —                                                                   |
 
 Mettre à jour ce tableau à chaque validation de CDC et à chaque livraison de code.
 
@@ -37,7 +37,7 @@ Les documents sont dans `docs/`. En cas de conflit, l'ordre de priorité est le 
 4. **Le référentiel v0.3** (`docs/KG Pay – Core Business Version-0.3.md`), pour la vision, le vocabulaire, les règles RP et les diagrammes.
 5. Les versions v0.1 et v0.2 : **historique uniquement**, ne pas les utiliser pour décider.
 
-Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration. Le workspace pnpm/Turborepo est en place ; aucun service ni frontend applicatif n'est encore implémenté. Aucun remote GitHub n'est configuré.
+Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration et des branches de travail dérivées de `dev`. Le workspace pnpm/Turborepo est en place. `auth-service` est en cours de bootstrap ; aucun parcours métier d'identité ni frontend applicatif n'est encore livré. Aucun remote GitHub n'est configuré.
 
 Le template de dossier est mentionné dans des documents existants, mais aucun fichier de template n'est présent dans `docs/` à la date de cette revue. Ne pas supposer qu'il existe ; le créer ou corriger les références avant de l'utiliser.
 
@@ -125,21 +125,18 @@ Issus du référentiel v0.3 (§2, §6.1, règles RP) :
 
 ## 8. Commandes disponibles et cibles
 
-Commande actuellement disponible :
+Commandes de validation actuellement disponibles :
 
 ```bash
 pnpm install
+pnpm run build
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+pnpm --filter auth-service test:e2e
 ```
 
-Les commandes suivantes ne deviennent disponibles qu'après déclaration de scripts dans les manifests des packages :
-
-```bash
-pnpm env:build            # fusionne global.env + service.env vers les builds
-pnpm build                # build de tous les services et packages (Turborepo)
-pnpm test                 # tests unitaires et d'intégration
-pnpm lint                 # lint + règles de dépendance entre packages et services
-pnpm --filter auth-service start:dev
-```
+`pnpm env:build` et les vérifications de dépendances inter-packages restent indisponibles : leurs scripts et packages n'existent pas encore.
 
 ## 9. Workflow d'un cœur métier
 

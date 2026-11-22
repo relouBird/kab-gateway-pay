@@ -1,6 +1,6 @@
 # KG Pay — Guide développeur
 
-> **État au 21 novembre 2026 :** le dépôt Git local et le socle pnpm/Turborepo sont initialisés sur `main`, avec une branche `dev`. Le dépôt distant GitHub n'est pas configuré. Le code applicatif, les services, les applications, leurs dépendances et la CI restent à créer.
+> **État au 21 novembre 2026 :** le dépôt Git local et le workspace pnpm/Turborepo sont initialisés (`main` → `dev` → branches de travail), sans remote GitHub. `services/auth-service` est en cours de bootstrap et expose uniquement `GET /health` ; aucun parcours métier d'identité ni frontend KG Pay n'est encore livré.
 
 ## Démarrage d'une nouvelle tâche
 
@@ -15,10 +15,11 @@ Le CDC d'un cœur couvre ses exigences frontend **et** backend. Ne pas créer un
 
 ## État de la base applicative
 
-- Il n'y a pas encore de backend KG Pay ni de frontend KG Pay. Les workspaces `apps/`, `packages/` et `services/` sont des emplacements cibles, pas des applications implémentées.
+- `services/auth-service` expose `GET /health` et contient désormais le transport SMTP et les modèles e-mail bilingues pour OTP ; la persistance, la validation MFA, les sessions et les autres flux d'authentification ne sont pas encore livrés. Le frontend KG Pay reste à construire.
 - `nexus-gate-web` est un exemple séparé de frontend avec des pages d'authentification, Yup, Zustand et Axios. Il sert de référence de conventions, pas de backend, de contrat API ou de modèle d'identité à recopier.
-- Le CDC-01 exige le MFA pour tous les sujets. La méthode du second facteur pour les clients n'est pas arbitrée.
-- Les rôles internes et leurs permissions sont encore proposés, pas validés en détail.
+- Le CDC-01 exige un OTP par e-mail après le mot de passe, à chaque nouvelle connexion, pour `CUSTOMER` comme pour `STAFF`. La boîte e-mail devient un facteur de sécurité critique ; cette solution est moins indépendante qu'un authenticator.
+- Seul l'e-mail est un identifiant vérifié. Le téléphone est conservé comme moyen de contact non vérifié, sans login, OTP SMS ni récupération de compte.
+- Les rôles intégrés V1 sont `GLOBAL_SUPER_ADMIN`, `OPERATIONS_ADMIN`, `CONFIGURATION_ADMIN` et `CUSTOMER`. Le super-admin crée les comptes STAFF et les rôles personnalisés à partir d'un catalogue fermé de permissions ; RP-10 reste obligatoire.
 - Le routage par chemin et l'hébergement mutualisé doivent être vérifiés avant le déploiement backend.
 - La progression demandée est cœur par cœur, en commençant par le cœur 1. Ne pas générer les autres services avant validation de leurs CDC.
 
@@ -36,29 +37,26 @@ L'architecture ci-dessous est cadrée par ADR-001/ADR-002 ; les éléments expli
 
 ## Dépendances et installation
 
-Le workspace racine utilise pnpm 10.28.2 et Turborepo. Husky et les outils de formatage du hook sont déclarés dans le manifest racine ; les dépendances des applications, services et packages restent à déclarer dans leurs propres manifests.
+Le workspace racine utilise pnpm 10.28.2 et Turborepo. Le manifest de `auth-service` déclare ses dépendances et scripts de vérification ; les futurs services et applications auront leurs propres manifests.
 
-Commandes disponibles au bootstrap :
+Commandes de validation disponibles :
 
 ```bash
 pnpm install
+pnpm run build
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+pnpm --filter auth-service test:e2e
 ```
 
-Les tâches `build`, `lint`, `typecheck` et `test` seront exécutables avec Turborepo lorsque les packages concernés déclareront ces scripts. Ne pas annoncer une validation comme passée si aucun script correspondant n'existe.
-
-Quand le squelette applicatif sera créé :
-
-- La configuration racine déclare Node.js `>=22.20.0` et pnpm `10.28.2` ; les versions résolues des dépendances sont verrouillées dans `pnpm-lock.yaml`.
-- Les dépendances seront déclarées dans le manifest de chaque app, service et package ; le lockfile racine sera versionné.
-- Les commandes de démarrage, build, format, lint, typecheck, tests, génération de contrat, migration et déploiement seront ajoutées ici à partir des scripts réellement configurés.
-- Les versions non secrètes de configuration seront documentées dans des `.env.example`. Les secrets seront injectés hors Git ; jamais dans `env/global.env`, les manifests, les logs ou la documentation.
+La configuration racine déclare Node.js `>=22.20.0` et pnpm `10.28.2` ; les versions résolues sont verrouillées dans `pnpm-lock.yaml`. Les commandes de démarrage, migrations et déploiement seront documentées à mesure qu'elles seront réellement configurées.
 
 ## Git, hooks et validation
 
 - Le dépôt Git local est initialisé à la racine. `main` est la branche principale et `dev` la branche d'intégration ; les branches de travail partent de `dev`.
 - Aucun remote n'est configuré et aucune branche n'est publiée. Ajouter un remote ou pousser requiert l'URL et l'accord du porteur du projet.
-- Husky exécute avant chaque commit `lint-staged` sur les fichiers JavaScript/TypeScript/JSON concernés, puis `git diff --cached --check` sur les changements indexés.
-- Les hooks seront complétés avec les scripts réels de lint, typecheck et tests quand les premiers packages applicatifs seront créés.
+- Husky exécute avant chaque commit `lint-staged`, puis les scripts racine de lint, typecheck et tests, et enfin `git diff --cached --check`.
 - La CI doit compléter les hooks locaux ; un hook ne remplace pas les suites de tests ou la revue.
 - Ne pas ajouter des hooks, scripts ou fichiers de configuration qui prétendent valider sans lancer de vérification effective.
 
@@ -72,10 +70,9 @@ Quand le squelette applicatif sera créé :
 ## Séquence de création recommandée
 
 1. Initialiser Git, `main`/`dev`, le workspace pnpm/Turborepo et le hook local.
-2. Arbitrer les points bloquants du CDC-01 et de la stratégie de session avant de figer les contrats.
-3. Créer les manifests et scripts des premiers packages ; compléter les validations réelles de lint/typecheck/tests.
-4. Implémenter les contrats du cœur 1 et `auth-service` selon le CDC-01.
-5. Implémenter les interfaces d'authentification du même cœur en consommant ces contrats.
-6. Vérifier la compatibilité réelle de l'hébergement cible avant d'établir les instructions de déploiement.
+2. Construire le socle `auth-service` et implémenter l'OTP e-mail pour `CUSTOMER` et `STAFF`.
+3. Implémenter les rôles intégrés, les rôles personnalisés limités au catalogue de permissions et les contrôles d'administration validés dans le CDC-01.
+4. Compléter les parcours backend du CDC-01 ; conserver les interfaces comme exigences du CDC, mais hors de cette tranche backend.
+5. Vérifier la compatibilité réelle de l'hébergement cible avant d'établir les instructions de déploiement.
 
-Ne pas considérer cette séquence comme un plan autorisant l'implémentation tant que les choix bloquants du CDC-01 ne sont pas arbitrés.
+Les points ouverts bloquent les fonctionnalités qui en dépendent, mais pas le socle extensible. Aucun parcours authentifié ne sera implémenté sans MFA vérifié.

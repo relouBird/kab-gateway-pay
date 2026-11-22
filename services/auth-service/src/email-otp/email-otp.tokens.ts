@@ -1,0 +1,2 @@
+export const EMAIL_TRANSPORT = Symbol('EMAIL_TRANSPORT');
+export const EMAIL_FROM_ADDRESS = Symbol('EMAIL_FROM_ADDRESS');
