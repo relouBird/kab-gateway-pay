@@ -2,7 +2,13 @@ const { generateKeyPairSync, randomBytes, randomUUID } = require("node:crypto");
 const { mkdirSync, writeFileSync } = require("node:fs");
 const { resolve } = require("node:path");
 
-const outputDirectory = resolve(process.cwd(), ".local-secrets");
+const outputDirectory = resolve(
+  __dirname,
+  "..",
+  "services",
+  "auth-service",
+  ".local-secrets",
+);
 mkdirSync(outputDirectory, { recursive: true, mode: 0o700 });
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {

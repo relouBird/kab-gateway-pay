@@ -88,7 +88,7 @@ Sécurité générale :
 3. Pour chaque incertitude bloquante, poser une question ciblée avant d'implémenter. Ne pas combler silencieusement les points ouverts.
 4. Faire des changements précis, cohérents frontend/backend si le parcours le nécessite, et mettre à jour le CDC/ADR lié lorsque l'exigence ou une décision change.
 5. Ajouter des tests ciblés pour le comportement modifié ; exécuter les scripts existants les plus étroits qui couvrent la modification. Ne pas prétendre avoir testé une commande absente.
-6. Ne pas installer de dépendances tant qu'un manifest n'existe pas ou qu'un outil requis ne manque pas pour une validation prévue. Les dépendances de chaque app/package résident dans son manifest ; le lockfile est généré par le gestionnaire choisi.
+6. Ne pas installer de dépendances tant qu'un manifest n'existe pas ou qu'un outil requis ne manque pas pour une validation prévue. Les dépendances de chaque app/package résident dans son manifest ; le lockfile est généré par le gestionnaire choisi. Garder les commandes opérateur ciblées par workspace dans le `package.json` racine, et les tâches standards `build`, `dev`, `lint`, `typecheck`, `test` ainsi que leurs lifecycle hooks dans chaque workspace pour Turbo.
 7. Ajouter au journal la date, le CDC ou l'ADR, les actions/fichiers, les validations réellement exécutées, les questions restantes et la prochaine étape.
 8. Terminer par un résumé concis des résultats, validations et blocages.
 

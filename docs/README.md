@@ -144,10 +144,18 @@ pnpm run build
 pnpm run lint
 pnpm run typecheck
 pnpm run test
-pnpm --filter auth-service test:e2e
+pnpm test:e2e:auth-service
+pnpm build:auth-service
+pnpm start:auth-service
+pnpm auth:keygen
+pnpm db:auth-service:generate
+pnpm db:auth-service:migrate:dev
+pnpm db:auth-service:migrate:deploy
 ```
 
-Pour `auth-service`, copier `.env.example` vers `.env`, renseigner l'URL PostgreSQL et les clés runtime, puis démarrer avec `pnpm --filter auth-service start:dev`. Le générateur ciblé est également exécuté automatiquement par les commandes de démarrage et de migration du service.
+Les commandes racine fournissent les alias ciblés par workspace (`build:auth-service`, `start:auth-service`, `db:auth-service:*`, `test:*:auth-service`). Les scripts `build`, `dev`, `lint`, `typecheck` et `test` restent dans le manifest de chaque workspace car Turbo les appelle directement.
+
+Pour `auth-service`, copier `.env.example` vers `.env`, renseigner l'URL PostgreSQL et les clés runtime, puis démarrer avec `pnpm start:auth-service`. Le générateur ciblé est également exécuté automatiquement par les commandes de démarrage et de migration.
 
 ## 9. Workflow d'un cœur métier
 

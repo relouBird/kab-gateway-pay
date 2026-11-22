@@ -50,10 +50,18 @@ pnpm run build
 pnpm run lint
 pnpm run typecheck
 pnpm run test
-pnpm --filter auth-service test:e2e
+pnpm test:e2e:auth-service
+pnpm build:auth-service
+pnpm start:auth-service
+pnpm auth:keygen
+pnpm db:auth-service:generate
+pnpm db:auth-service:migrate:dev
+pnpm db:auth-service:migrate:deploy
 ```
 
 La configuration racine déclare Node.js `>=22.20.0` et pnpm `10.28.2` ; les versions résolues sont verrouillées dans `pnpm-lock.yaml`. Les commandes locales, migrations et essais Swagger d'`auth-service` sont documentés dans [son README](./services/auth-service/README.md).
+
+Les scripts racine sont les commandes d'entrée pour les opérations courantes ciblées par workspace (`build:auth-service`, `start:auth-service`, `db:auth-service:*`, `test:*:auth-service`). Les scripts `build`, `dev`, `lint`, `typecheck` et `test` restent déclarés dans chaque workspace pour l'orchestration Turbo.
 
 La configuration locale a une seule source éditable à la racine (`.env`, ignoré par Git). `.env.example` est un modèle sans secrets. Les fichiers par workspace sont générés sous `.generated/env/` ; leur rôle, leur contenu et leur cycle de vie sont décrits dans [docs/README.md](./docs/README.md) et [ADR-001](./docs/architecture/ADR-001-monorepo-microservices.md).
 

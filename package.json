@@ -11,10 +11,27 @@
     "env:build": "node scripts/generate-env.cjs --mode build",
     "env:runtime": "node scripts/generate-env.cjs --mode runtime",
     "build": "turbo run build",
+    "build:auth-service": "turbo run build --filter=auth-service",
     "dev": "turbo run dev",
+    "start:auth-service": "pnpm --filter auth-service start:dev",
+    "start:auth-service:debug": "pnpm --filter auth-service start:debug",
+    "start:auth-service:prod": "pnpm --filter auth-service start:prod",
+    "auth:bootstrap": "pnpm --filter auth-service auth:bootstrap",
+    "auth:keygen": "node scripts/generate-signing-keys.cjs",
+    "db:auth-service:generate": "pnpm --filter auth-service exec prisma generate",
+    "db:auth-service:migrate:dev": "node scripts/run-prisma.cjs migrate dev",
+    "db:auth-service:migrate:deploy": "node scripts/run-prisma.cjs migrate deploy",
+    "format:auth-service": "pnpm --filter auth-service format",
     "lint": "turbo run lint",
+    "lint:auth-service": "turbo run lint --filter=auth-service",
     "typecheck": "turbo run typecheck",
-    "test": "node --test scripts/generate-env.test.cjs && turbo run test"
+    "typecheck:auth-service": "turbo run typecheck --filter=auth-service",
+    "test": "node --test scripts/generate-env.test.cjs && turbo run test",
+    "test:auth-service": "pnpm --filter auth-service test",
+    "test:auth-service:watch": "pnpm --filter auth-service test:watch",
+    "test:auth-service:coverage": "pnpm --filter auth-service test:cov",
+    "test:auth-service:debug": "pnpm --filter auth-service test:debug",
+    "test:e2e:auth-service": "pnpm --filter auth-service test:e2e"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
