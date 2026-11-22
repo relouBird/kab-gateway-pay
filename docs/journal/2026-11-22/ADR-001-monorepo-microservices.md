@@ -1,0 +1,10 @@
+# Journal — ADR-001 — 2026-11-22
+
+- **Objectif :** implémenter le mécanisme de configuration non secrète décrit par ADR-001 §5 pour `auth-service`.
+- **Statut :** terminé.
+- **Résumé :** ajout de `env/global.env`, d'un schéma JSON avec allowlist et `sharedKeys`, de `service.env` et d'un générateur Node portable. Le générateur filtre `global.env` par `sharedKeys`, laisse `service.env` prioritaire, valide les clés/valeurs et produit `build.env` ignoré. `DATABASE_URL`, `SMTP_USER`, `SMTP_PASSWORD` et toute clé contenant `JWT` sont explicitement refusés. `service.env` comprend les paramètres numériques OTP/sessions/sécurité de CDC-01 §8.5, marqués comme valeurs proposées, ainsi que les paramètres de cookie et CORS (`AUTH_CORS_ORIGINS` vide par défaut). Suppression de l'ancien `.env.example`.
+- **Fichiers modifiés :** `env/global.env`, `services/auth-service/env.schema.json`, `services/auth-service/service.env`, `scripts/build-env.cjs`, `services/auth-service/README.md`, `services/auth-service/.env.example` (supprimé), `docs/architecture/ADR-001-monorepo-microservices.md`, `docs/README.md`.
+- **Sections concernées :** ADR-001 §3 et §5 ; documentation des variables d'environnement et du bootstrap `auth-service`.
+- **Validations :** `pnpm env:build`, `pnpm --filter auth-service build`, `pnpm --filter auth-service typecheck` et `docker compose -f docker-compose.dev.yml config --quiet` réussis. Prisma Client est généré et `prisma validate` réussit avec une URL locale factice. La validation des tests et du lint est consignée dans le journal CDC-01.
+- **Points ouverts :** les valeurs OTP de `service.env` restent les valeurs par défaut proposées par CDC-01 §8.5, à valider avant production. Les secrets restent à injecter à l'exécution. Le démon Docker étant indisponible, la migration réelle et le démarrage du service n'ont pas été vérifiés.
+- **Suite attendue :** démarrer PostgreSQL/Maildev avec Docker, appliquer la migration, puis vérifier le parcours et Swagger en fonctionnement sans exposer de secrets.

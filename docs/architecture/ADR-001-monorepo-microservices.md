@@ -60,10 +60,10 @@ kgpay/
 │       ├── src/
 │       ├── prisma/schema.prisma  # propre à ce service
 │       ├── service.env           # variables propres non secrètes
-│       ├── env.schema.ts         # variables attendues et clés partagées autorisées
+│       ├── env.schema.json       # variables attendues et clés partagées autorisées
 │       └── Dockerfile
 ├── scripts/
-│   └── build-env.ts              # fusion global.env + service.env au build
+│   └── build-env.cjs             # fusion global.env + service.env au build
 ├── pnpm-workspace.yaml
 └── turbo.json
 ```
@@ -86,22 +86,25 @@ kgpay/
 
 **Fichiers**
 
-- `env/global.env` : variables **non secrètes** communes (versionné). Exemples : `LOG_LEVEL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL`, `BROKER_HOST`, `DEFAULT_CURRENCY`.
+- `env/global.env` : variables **non secrètes** communes (versionné). Pour `auth-service`, `NODE_ENV`, `LOG_LEVEL`, `AUTH_ISSUER` et `AUTH_AUDIENCE` sont partagées.
 - `services/<service>/service.env` : variables propres non secrètes (versionné).
-- Secrets (clés privées, mots de passe de base, `BROKER_URL` avec identifiants) : **jamais dans ces fichiers**. Ils sont injectés par l'orchestrateur ou le gestionnaire de secrets au déploiement, et par un `.env.local` ignoré par Git en développement.
+- `services/<service>/env.schema.json` : schéma déclarant les clés autorisées et `sharedKeys`.
+- Secrets (clés JWT, `DATABASE_URL`, identifiants SMTP, mots de passe de base, `BROKER_URL` avec identifiants) : **jamais dans ces fichiers ni lus par le générateur**. Ils sont injectés par l'orchestrateur ou le gestionnaire de secrets au déploiement, et par un `.env.local` ignoré par Git en développement.
 
 **Déroulé**
 
-1. Chaque service déclare dans `env.schema.ts` la liste de ses variables et, parmi elles, celles qu'il accepte d'hériter de `global.env` (`sharedKeys`).
-2. `pnpm env:build` exécute `scripts/build-env.ts` : pour chaque service, il fusionne `global.env` (limité aux `sharedKeys`) et `service.env`, puis écrit un fichier généré dans le dossier de build du service (ex. `dist/build.env`).
-3. Au démarrage, le service charge `build.env`, puis les variables d'environnement réelles (secrets, surcharges), valide le tout avec `@kgpay/config` et **refuse de démarrer** si une variable manque ou est invalide.
-4. Après le build, plus rien ne lit `env/global.env`.
+1. Chaque service déclare dans `env.schema.json` la liste de ses variables et, parmi elles, celles qu'il accepte d'hériter de `global.env` (`sharedKeys`).
+2. `node scripts/build-env.cjs` fusionne `global.env` (limité aux `sharedKeys`) et `service.env` (prioritaire), valide les clés et leur format, puis écrit un `build.env` généré et ignoré dans le dossier du service.
+3. Le script racine `pnpm env:build` valide et génère `services/auth-service/build.env`. Le build de `auth-service` copie automatiquement ce fichier vers `dist/build.env` après la compilation Nest (`deleteOutDir`).
+4. Au démarrage, `auth-service` charge les secrets locaux de `.env.local` puis `build.env`; les variables déjà fournies par l'environnement d'exécution gardent la priorité. Il valide la configuration et **refuse de démarrer** si une variable manque ou est invalide.
+5. Après le build, plus rien ne lit `env/global.env`.
 
 **Règles**
 
 - Une variable absente de `sharedKeys` n'est jamais copiée dans un service.
 - Une valeur de `service.env` l'emporte sur `global.env` ; une variable d'environnement réelle l'emporte sur les deux.
-- Toute nouvelle variable est ajoutée au schéma, à l'exemple (`*.example`) et au README du service dans la même modification.
+- Toute nouvelle variable est ajoutée au schéma, au fichier non secret `service.env` et au README du service dans la même modification.
+- Les clés `OTP_HASH_KEY`, `IP_HASH_KEY`, les clés JWT, `DATABASE_URL`, les credentials SMTP et les secrets de clients internes sont exclusivement runtime et sont refusés par le générateur.
 
 ## 6. Découpage des cœurs en services [PROPOSITION]
 
@@ -149,3 +152,4 @@ Basé sur l'hypothèse du référentiel v0.3 §8.1, précisé pour des services 
 | --- | --- | --- |
 | 1 — Identité et accès | 20 nov. 2026 | Création de l'ADR. Choix D8 (JWT asymétrique + JWKS) induit par l'absence de gateway. |
 | Bootstrap du dépôt | 21 nov. 2026 | Le porteur valide pnpm workspaces et Turborepo ; le dépôt Git local est initialisé sur `main` avec `dev` comme branche d'intégration. |
+| Cœur 1 — backend | 22 nov. 2026 | Générateur racine `pnpm env:build`, chargement runtime du `build.env`, secrets hors des fichiers de build et relay local d'outbox sans choix de broker. |

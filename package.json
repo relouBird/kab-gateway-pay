@@ -8,10 +8,19 @@
   },
   "scripts": {
     "prepare": "husky",
-    "build": "turbo run build",
+    "env:build": "node scripts/build-env.cjs",
+    "build": "pnpm env:build && turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "argon2",
+      "prisma"
+    ]
   },
   "devDependencies": {
     "husky": "^9.1.7",
