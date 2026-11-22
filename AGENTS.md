@@ -1,6 +1,6 @@
 # Instructions pour les agents — KG Pay
 
-> **Emplacement attendu :** racine du dépôt KG Pay, à côté du `README.md` développeur. Dans le dossier documentaire actuel, ce fichier est préparé sous `docs/` ; le déplacer à la racine avant de commencer les travaux de code. S'il s'y trouve déjà, poursuivre sans le déplacer à nouveau. Les chemins ci-dessous sont écrits relativement à son emplacement final.
+> **Emplacement :** racine du dépôt KG Pay, à côté du `README.md` développeur. Les chemins ci-dessous sont écrits relativement à cet emplacement.
 
 ## 1. Langue et mission
 
@@ -11,9 +11,9 @@
 
 ## 2. État réel du projet au 21 novembre 2026
 
-- Le dossier disponible à la création de ces consignes contient la documentation ; **le monorepo applicatif KG Pay, son dépôt Git, son code source et ses manifests ne sont pas encore créés**.
-- Il n'existe donc pas encore de commandes applicatives exécutables, de dépendances installables, de pipeline, de hooks Husky ni de déploiement à inspecter. Ne pas déclarer ces éléments présents.
-- Le CDC-01 est le premier CDC, version 0.1, et reste un brouillon pour validation. ADR-001 et ADR-002 sont des documents proposés ; leurs propositions non validées ne sont pas des décisions acquises.
+- Le dépôt Git local et le workspace pnpm/Turborepo sont initialisés ; `main` est la branche principale, `dev` la branche d'intégration, et les branches de travail partent de `dev`. Aucun remote GitHub n'est configuré.
+- `services/auth-service` est en cours de bootstrap ; il ne porte encore aucun parcours métier d'identité. Le frontend KG Pay, la CI et le déploiement ne sont pas créés.
+- Le CDC-01 est validé comme base V1 avec ses points ouverts conservés. Un OTP par e-mail après le mot de passe est confirmé pour `CUSTOMER` et `STAFF` à chaque nouvelle connexion. L'envoi de développement passe par SMTP configurable (Maildev) ; la disponibilité/sécurité de la boîte e-mail est un risque résiduel. Les paramètres OTP et la récupération restent à préciser.
 - `nexus-gate-web` est la seule référence frontend/auth fournie. C'est un projet distinct avec son propre contexte : ses appels, rôles, parcours d'équipe/`CREATOR` et choix de sécurité ne sont pas les contrats de KG Pay.
 - `master/` contient des références PDF/Word administratives : **ne pas l'explorer ni s'en servir comme source** sauf demande explicite du porteur du projet.
 - Ne pas ouvrir ou parcourir `node_modules`, les fichiers `.env`/secrets, ni les sorties générées telles que `dist/`, sauf demande explicite et nécessité démontrée. Préférer `.env.example` sans secrets.
@@ -65,8 +65,9 @@ Sécurité générale :
 ## 5. Règles actuelles du cœur 1
 
 - Le cœur 1 gère identités, sessions, MFA, rôles/permissions et accès ; il ne porte pas le dossier KYC ni la décision de validation client, qui relèvent du cœur 2.
-- **MFA obligatoire pour tous les sujets** est une orientation confirmée par le porteur du projet. TOTP est proposé pour le personnel ; le facteur client, son enrôlement et sa récupération restent à arbitrer. Ne pas ouvrir d'accès privilégié sans MFA, même si sa livraison est découpée.
-- La liste proposée des rôles internes est `OPERATIONS_ADMIN`, `CONFIGURATION_ADMIN`, `SECURITY_ADMIN` ; elle reste à valider avec les permissions exactes. `SECURITY_ADMIN` administre les identités mais n'est pas un superutilisateur métier et ne reçoit pas des droits par héritage.
+- **MFA obligatoire pour tous les sujets** est confirmé par mot de passe puis OTP e-mail à chaque nouvelle connexion. Ne pas ouvrir de session complète ni d'accès privilégié avant validation du code. Un OTP e-mail est moins indépendant qu'un authenticator et sa récupération doit être définie.
+- Seul l'e-mail est un identifiant vérifié ; le téléphone n'est qu'un contact non vérifié. La perte d'accès à l'e-mail CUSTOMER relève du support, jamais d'un OTP envoyé au téléphone.
+- Les rôles intégrés sont `CUSTOMER`, `GLOBAL_SUPER_ADMIN`, `OPERATIONS_ADMIN` et `CONFIGURATION_ADMIN`. Le super-admin gère identités, sécurité, attribution des rôles et rôles personnalisés composés depuis un catalogue fermé ; il dispose de toutes les permissions du catalogue. RP-10 s'applique sans exception : il ne peut pas approuver une demande qu'il a demandée ou instruite.
 - La fenêtre UI de deux secondes est un délai avant envoi HTTP pour les actions explicitement déclarées annulables. L'annulation avant envoi signifie qu'aucune requête ne part ; après envoi, le résultat dépend de la réponse serveur. Cela ne retarde pas une désactivation urgente.
 - Une suppression logique via `deletedAt` dépend du CDC du domaine ; les journaux d'audit et écritures comptables immuables ne sont pas supprimés.
 

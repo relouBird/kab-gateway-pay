@@ -1,2 +1,5 @@
 pnpm exec lint-staged
+pnpm run lint
+pnpm run typecheck
+pnpm run test
 git diff --cached --check
