@@ -47,7 +47,7 @@ Le `.env` racine ignoré par Git est l'unique fichier de configuration à modifi
 Générer les clés locales :
 
 ```powershell
-pnpm --filter auth-service auth:keygen
+pnpm auth:keygen
 ```
 
 La commande crée une paire RSA et deux clés HMAC dans `services/auth-service/.local-secrets/` et n'affiche pas le contenu des secrets. Reporter dans le `.env` racine les valeurs indiquées par la commande (`JWT_PRIVATE_KEY_FILE__AUTH_SERVICE`, `JWT_KEY_ID__AUTH_SERVICE`, `OTP_HASH_KEY__AUTH_SERVICE` et, en local si souhaité, `IP_HASH_KEY__AUTH_SERVICE`). Ne jamais committer le `.env`, les clés ou les sorties runtime.
@@ -72,8 +72,8 @@ Le build et le démarrage via Turbo déclenchent eux-mêmes la génération appr
 Appliquer la migration et lancer le service :
 
 ```powershell
-pnpm --filter auth-service db:migrate:dev
-pnpm --filter auth-service start:dev
+pnpm db:auth-service:migrate:dev
+pnpm start:auth-service
 ```
 
 Le service écoute sur `http://localhost:3000`. Swagger est disponible sur [`http://localhost:3000/docs`](http://localhost:3000/docs) en développement/test uniquement. La liveness `GET /health` ne nécessite ni authentification ni accès à la base une fois le service démarré.
@@ -85,7 +85,7 @@ Maildev reçoit les messages sur `127.0.0.1:1025` et expose sa boîte de récept
 1. `POST /auth/register`, puis relever le code dans Maildev et appeler `POST /auth/verify-contact`.
 2. `POST /auth/login`, relever le nouvel OTP envoyé par e-mail, puis appeler `POST /auth/mfa/verify`.
 3. Copier `accessToken` dans **Authorize** avec le schéma bearer pour appeler les routes authentifiées.
-4. Pour initialiser le premier administrateur, lancer `pnpm --filter auth-service auth:bootstrap` dans un terminal interactif. La CLI demande le mot de passe sans l'afficher, envoie un OTP à l'adresse choisie et vérifie ce code avant d'activer le premier `GLOBAL_SUPER_ADMIN`.
+4. Pour initialiser le premier administrateur, lancer `pnpm auth:bootstrap` dans un terminal interactif. La CLI demande le mot de passe sans l'afficher, envoie un OTP à l'adresse choisie et vérifie ce code avant d'activer le premier `GLOBAL_SUPER_ADMIN`.
 5. Pour une route protégée par step-up, appeler `POST /auth/step-up` avec la catégorie d'action, relever le code e-mail, puis rappeler la route avec la preuve retournée via le schéma Swagger `step_up_proof`.
 6. Pour tester refresh/logout par cookie, appeler `GET /auth/csrf`, conserver le cookie et la valeur retournée, puis autoriser le schéma `csrf_token` avec cette valeur avant `POST /auth/refresh` ou `POST /auth/logout`.
 
@@ -96,11 +96,14 @@ Swagger conserve les cookies nécessaires au même hôte mais ne persiste pas le
 Les migrations Prisma sont versionnées sous `prisma/migrations/`. La migration initiale protège aussi `AccessEvent` contre les mises à jour/suppressions. Commandes disponibles :
 
 ```powershell
-pnpm --filter auth-service lint
-pnpm --filter auth-service typecheck
-pnpm --filter auth-service test
-pnpm --filter auth-service test:e2e
-pnpm --filter auth-service build
+pnpm db:auth-service:generate
+pnpm db:auth-service:migrate:dev
+pnpm db:auth-service:migrate:deploy
+pnpm lint:auth-service
+pnpm typecheck:auth-service
+pnpm test:auth-service
+pnpm test:e2e:auth-service
+pnpm build:auth-service
 ```
 
 Les valeurs numériques du CDC-01 §8.5 restent des valeurs proposées configurables, pas des décisions métier. Les interfaces client/personnel, le parcours support de récupération d'un `CUSTOMER` ayant perdu sa boîte e-mail, le fournisseur SMTP de production et le choix du broker restent ouverts. En attendant le broker, le relay local journalise uniquement les identifiants/noms d'événement ; les payloads restent dans l'outbox et ne sont pas envoyés à des consommateurs.
