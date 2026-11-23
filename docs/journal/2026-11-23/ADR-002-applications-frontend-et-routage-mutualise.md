@@ -1,5 +1,16 @@
 # Journal — ADR-002 — 2026-11-23
 
+## Mise à jour — Décisions D2/D3 et mise en œuvre de customer-portal
+
+- **Objectif :** consigner les arbitrages du porteur sur les applications frontend et les contrats partagés, et décrire leur mise en œuvre.
+- **Statut :** terminé pour la documentation ; D2/D3 passent en [DÉCISION], le statut global de l'ADR reste « Proposé, à valider ».
+- **Résumé :** D2 = deux applications (`customer-portal` livrée, `staff-portal` à faire). D3 = Yup et types de transport dans `@kgpay/contracts/transport`. §8 : points 2, 3 (Yup) et 5 (langue navigateur, repli français, mémorisation `localStorage`) tranchés. Nouvelle §11 décrivant l'application, le client HTTP, la session en mémoire, les variables d'environnement et les points ouverts.
+- **Chemins modifiés :** `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`.
+- **Exigences/sections concernées :** ADR-002 D2, D3, D11, §8, §11 ; CDC-01 §8.10-8.11.
+- **Validations :** documentation uniquement ; contrôle de format voir le journal CDC-01 du même jour.
+- **Points ouverts :** `staff-portal`, hébergement mutualisé (D5), origines/cookies/CSRF en production, package partagé de composants UI.
+- **Suite attendue :** valider ou ajuster D4-D11 ; démarrer `staff-portal` après arbitrage.
+
 ## Mise à jour — Transfert du backend auth-service au frontend
 
 - **Objectif :** rendre visibles dans l'ADR-002 les ressources backend du cœur 1 disponibles pour démarrer le frontend.

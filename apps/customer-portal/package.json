@@ -1,0 +1,46 @@
+{
+  "name": "customer-portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Espace client KG Pay — parcours d'identité du CDC-01",
+  "type": "module",
+  "scripts": {
+    "predev": "node ../../scripts/generate-env.cjs --target customer-portal --mode runtime",
+    "dev": "node ../../scripts/run-with-env.cjs --target customer-portal --mode runtime -- vite",
+    "prebuild": "node ../../scripts/generate-env.cjs --target customer-portal --mode build",
+    "build": "tsc --noEmit && node ../../scripts/run-with-env.cjs --target customer-portal --mode build -- vite build",
+    "preview": "vite preview",
+    "lint": "oxlint --type-aware src/",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/inter-tight": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@kgpay/contracts": "workspace:*",
+    "axios": "^1.21.1",
+    "i18next": "^27.2.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-i18next": "^18.0.3",
+    "react-router": "^8.5.2",
+    "yup": "^1.7.1",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^8.0.0",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.13",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "jsdom": "^31.0.1",
+    "oxlint": "^1.58.0",
+    "oxlint-tsgolint": "^7.0.2008",
+    "typescript": "^6.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
+  }
+}

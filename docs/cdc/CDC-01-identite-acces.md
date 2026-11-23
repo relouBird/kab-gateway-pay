@@ -389,6 +389,15 @@ Journaux structurés (JSON) avec `correlationId`. Métriques minimales : connexi
 - Pour une action explicitement marquée annulable, l'interface montre un compte à rebours de deux secondes avec une commande d'annulation et n'envoie la requête qu'à l'expiration du délai. En cas d'annulation, aucun appel n'est effectué ; après envoi, le résultat UI dépend de la réponse serveur.
 - Le backend n'utilise `deletedAt` que pour les ressources dont le CDC métier autorise une suppression logique. Les entrées comptables, les événements d'audit et les preuves financières ne sont jamais supprimés physiquement.
 
+### 8.11 État de l'implémentation frontend (23 novembre 2026)
+
+- **Espace client livré :** `apps/customer-portal` couvre inscription, vérification de contact, connexion avec OTP e-mail, récupération et réinitialisation de mot de passe, changement de mot de passe, changement d'e-mail et de téléphone (avec step-up), sessions actives, déconnexion et déconnexion globale, en français et en anglais, responsive. Langue : navigateur avec repli français, choix mémorisé.
+- **Back-office :** l'interface du personnel (`apps/staff-portal`) reste à construire ; l'administration des identités, rôles et invitations STAFF n'est pas couverte.
+- **IAM-F-24 :** le portail n'affiche aucun statut de dossier client ; l'état d'identité n'est jamais présenté comme validation du dossier.
+- **IAM-F-25 :** aucune action du cœur 1 n'est déclarée annulable ; la fenêtre de deux secondes n'est donc pas branchée.
+- **Contrats :** schémas Yup et types dans `@kgpay/contracts/transport`. Le portail utilise l'API réelle d'`auth-service` (collection Postman) ; l'origine du portail (`http://localhost:5173` en développement) doit figurer dans `AUTH_CORS_ORIGINS__AUTH_SERVICE`.
+- **Écarts/limites connus :** pas de `GET /auth/me` (l'e-mail courant n'est pas affiché) ; le changement de mot de passe révoque toutes les sessions, le portail renvoie donc vers la connexion ; les messages serveur ne sont pas affichés, les erreurs sont traduites côté front selon statut et contexte ; la récupération d'un CUSTOMER ayant perdu l'accès à son e-mail reste du ressort du support (point ouvert).
+
 ## 9. Cas limites et exceptions
 
 - **Réutilisation d'un refresh token** : famille révoquée, alerte journalisée.
