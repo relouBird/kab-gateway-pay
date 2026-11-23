@@ -1,0 +1,81 @@
+/* Tokens KG Pay « Convergence Silencieuse » — voir le skill kgpay-frontend-design. */
+:root {
+  --kg-green-900: #0b3d2e;
+  --kg-ink: #141a17;
+  --kg-sand-50: #f6f1e7;
+  --kg-sand-card: #fbf8f1;
+  --kg-ochre: #c77e2c;
+  --kg-sand-yellow: #e8b84b;
+  --kg-success: #1f8a5b;
+  --kg-error: #b4472e;
+  --kg-info: #2f5d7c;
+
+  --kg-text-muted: #4b544f;
+  --kg-border: rgba(20, 26, 23, 0.14);
+  --kg-border-strong: rgba(20, 26, 23, 0.35);
+  --kg-input-border: #66706a;
+
+  --kg-status-confirmed-bg: #dcefe4;
+  --kg-status-confirmed-fg: #12513a;
+  --kg-status-pending-bg: #f6e3bc;
+  --kg-status-pending-fg: #6f410c;
+  --kg-status-unknown-bg: #dae5ed;
+  --kg-status-unknown-fg: #1f4560;
+  --kg-status-failed-bg: #f3d8d0;
+  --kg-status-failed-fg: #862c19;
+  --kg-status-action-bg: #141a17;
+  --kg-status-action-fg: #e8b84b;
+
+  /* Rôles sémantiques (thème clair) */
+  --bg: var(--kg-sand-50);
+  --surface: var(--kg-sand-card);
+  --text: var(--kg-ink);
+  --text-muted: var(--kg-text-muted);
+  --primary: var(--kg-green-900);
+  --on-primary: var(--kg-sand-50);
+  --focus: var(--kg-green-900);
+  --error-text: #862c19;
+  --link: #0b3d2e;
+
+  --font-title:
+    "Inter Tight Variable", "Inter Tight", "Inter Variable", system-ui,
+    sans-serif;
+  --font-ui:
+    "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:
+    "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+  --space-6: 48px;
+  --radius-lg: 12px;
+  --radius-md: 8px;
+  --control-height: 52px;
+  --target-min: 48px;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 160ms;
+  --t-base: 240ms;
+  --t-slow: 480ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --kg-border: rgba(246, 241, 231, 0.2);
+    --kg-border-strong: rgba(246, 241, 231, 0.45);
+    --kg-input-border: rgba(246, 241, 231, 0.6);
+
+    --bg: #0b3d2e;
+    --surface: #0f4636;
+    --text: #f6f1e7;
+    --text-muted: rgba(246, 241, 231, 0.78);
+    --primary: #e8b84b;
+    --on-primary: #141a17;
+    --focus: #e8b84b;
+    --error-text: #f3b3a2;
+    --link: #e8b84b;
+  }
+}

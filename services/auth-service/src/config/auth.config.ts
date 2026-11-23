@@ -25,6 +25,7 @@ export interface AuthConfig {
   cookieSecure: boolean;
   cookieSameSite: 'strict' | 'lax' | 'none';
   corsOrigins: readonly string[];
+  staffPortalUrl?: string;
 }
 
 export const AUTH_CONFIG = Symbol('AUTH_CONFIG');
@@ -56,6 +57,33 @@ function readBoolean(env: NodeJS.ProcessEnv, name: string): boolean {
     return false;
   }
   throw new Error(`${name} must be "true" or "false".`);
+}
+
+function readOptionalPortalUrl(
+  env: NodeJS.ProcessEnv,
+  name: string,
+): string | undefined {
+  const value = env[name]?.trim();
+  if (!value) {
+    return undefined;
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${name} must be a valid portal URL.`);
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    (env.NODE_ENV === 'production' && url.protocol !== 'https:') ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error(`${name} contains an unsafe portal URL.`);
+  }
+  return url.toString().replace(/\/+$/, '');
 }
 
 export function readAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
@@ -141,5 +169,6 @@ export function readAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
     cookieSecure,
     cookieSameSite: sameSite,
     corsOrigins,
+    staffPortalUrl: readOptionalPortalUrl(env, 'STAFF_PORTAL_URL'),
   };
 }

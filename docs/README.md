@@ -8,22 +8,22 @@ Plateforme d'agrégation et d'orchestration de paiements : elle centralise plusi
 
 ## 1. État d'avancement
 
-| Cœur | Intitulé                            | Service                | CDC                                                                             | Code                                                                |
-| ---- | ----------------------------------- | ---------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| 1    | Identité et accès                   | `auth-service`         | Base V1 validée, points ouverts conservés (`docs/cdc/CDC-01-identite-acces.md`) | Backend en cours de finalisation et de recette ; interfaces web à construire |
-| 2    | Cycle de vie client                 | `customer-service`     | À faire                                                                         | —                                                                   |
-| 3    | Référentiel partenaires et méthodes | `partner-service`      | À faire                                                                         | —                                                                   |
-| 4    | Configuration des intégrations      | `partner-service`      | À faire                                                                         | —                                                                   |
-| 5    | Orchestration des paiements         | `payment-service`      | À faire                                                                         | —                                                                   |
-| 6    | Comptes et comptabilité interne     | `ledger-service`       | À faire                                                                         | —                                                                   |
-| 7    | Versements                          | `payout-service`       | À faire                                                                         | —                                                                   |
-| 8    | Tarification                        | `ledger-service`       | À faire                                                                         | —                                                                   |
-| 9    | Risque et conformité                | `risk-service`         | À faire                                                                         | —                                                                   |
-| 10   | Opérations internes                 | `ops-service`          | À faire                                                                         | —                                                                   |
-| 11   | Rapprochement                       | `ops-service`          | À faire                                                                         | —                                                                   |
-| 12   | Notifications et reporting          | `notification-service` | À faire                                                                         | —                                                                   |
-| 13   | Audit et traçabilité                | `audit-service`        | À faire                                                                         | —                                                                   |
-| 14   | Litiges et contestations            | `ops-service`          | À faire                                                                         | —                                                                   |
+| Cœur | Intitulé                            | Service                | CDC                                                                             | Code                                                                                      |
+| ---- | ----------------------------------- | ---------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1    | Identité et accès                   | `auth-service`         | Base V1 validée, points ouverts conservés (`docs/cdc/CDC-01-identite-acces.md`) | Portails client/personnel implémentés ; recette globale et gabarits de courriel à valider |
+| 2    | Cycle de vie client                 | `customer-service`     | À faire                                                                         | —                                                                                         |
+| 3    | Référentiel partenaires et méthodes | `partner-service`      | À faire                                                                         | —                                                                                         |
+| 4    | Configuration des intégrations      | `partner-service`      | À faire                                                                         | —                                                                                         |
+| 5    | Orchestration des paiements         | `payment-service`      | À faire                                                                         | —                                                                                         |
+| 6    | Comptes et comptabilité interne     | `ledger-service`       | À faire                                                                         | —                                                                                         |
+| 7    | Versements                          | `payout-service`       | À faire                                                                         | —                                                                                         |
+| 8    | Tarification                        | `ledger-service`       | À faire                                                                         | —                                                                                         |
+| 9    | Risque et conformité                | `risk-service`         | À faire                                                                         | —                                                                                         |
+| 10   | Opérations internes                 | `ops-service`          | À faire                                                                         | —                                                                                         |
+| 11   | Rapprochement                       | `ops-service`          | À faire                                                                         | —                                                                                         |
+| 12   | Notifications et reporting          | `notification-service` | À faire                                                                         | —                                                                                         |
+| 13   | Audit et traçabilité                | `audit-service`        | À faire                                                                         | —                                                                                         |
+| 14   | Litiges et contestations            | `ops-service`          | À faire                                                                         | —                                                                                         |
 
 Mettre à jour ce tableau à chaque validation de CDC et à chaque livraison de code.
 
@@ -42,7 +42,7 @@ travail dérivées de `dev`. Le workspace pnpm/Turborepo et le remote `origin` s
 tests unitaires et des parcours HTTP intégrés CUSTOMER/STAFF sur un schéma PostgreSQL temporaire isolé. Une recette
 supplémentaire valide l'envoi SMTP réel via Maildev/MCP pour les OTP de contact, connexion, récupération et step-up,
 ainsi que l'invitation STAFF. Ces essais ne constituent pas à eux seuls la recette complète du CDC-01 ; les autres
-scénarios d'administration et de sécurité restent à couvrir. Le frontend applicatif n'est pas encore livré.
+scénarios d'administration et de sécurité restent à couvrir. Les deux portails frontend sont présents ; les gabarits HTML bilingues OTP/invitation sont implémentés en proposition et leur copie finale reste à valider.
 
 Le template de dossier est mentionné dans des documents existants, mais aucun fichier de template n'est présent dans `docs/` à la date de cette revue. Ne pas supposer qu'il existe ; le créer ou corriger les références avant de l'utiliser.
 
@@ -60,8 +60,11 @@ Détails et justifications : `docs/architecture/ADR-001-monorepo-microservices.m
 - **Une base par service.** Aucun accès à la base d'un autre service. Un schéma Prisma par service, aucun package Prisma partagé.
 - **Communication** : événements asynchrones avec Transactional Outbox ; appels HTTP inter-services seulement s'ils sont justifiés dans un CDC.
 - **Authentification** : `auth-service` émet des JWT asymétriques ; les autres services les vérifient localement via JWKS avec `@kgpay/auth-guard`.
-- **Packages partagés** (`packages/`) : strictement techniques (`config`, `contracts`, `common`, `auth-guard`, `testing`). `contracts` peut fournir les schémas/types de transport communs au frontend et au backend ; jamais de modèle de persistance ni de décision métier côté interface.
+- **Packages partagés** (`packages/`) : strictement techniques (`config`, `contracts`, `common`, `auth-guard`, `testing`). `@kgpay/contracts` partage les schémas Yup/types de transport frontend/backend conformément à ADR-002 D3 ; jamais de modèle de persistance ni de décision métier côté interface.
 - **Frontend** : interfaces cadrées cœur par cœur dans les CDC correspondants ; voir [ADR-002](./architecture/ADR-002-applications-frontend-et-routage-mutualise.md) pour les propositions d'organisation, de contrats partagés et de routage.
+- `apps/customer-portal` couvre les parcours client du CDC-01 : inscription, OTP e-mail, connexion, récupération/changement de mot de passe, changement d'e-mail/téléphone avec step-up et sessions.
+- `apps/staff-portal` couvre les parcours personnels : connexion OTP, acceptation d'invitation, récupération de mot de passe, identités STAFF, rôles, récupération d'e-mail STAFF, revue/journal des accès et sessions propres accessibles à tout STAFF authentifié. L'administration est réservée visuellement à `GLOBAL_SUPER_ADMIN` ; les autorisations restent contrôlées par `auth-service`.
+- En développement, autoriser `http://localhost:5173` et `http://localhost:5174` dans `AUTH_CORS_ORIGINS__AUTH_SERVICE` et ajouter les clés `VITE_*__CUSTOMER_PORTAL` et `VITE_*__STAFF_PORTAL` de `.env.example` au `.env` racine.
 - **Un service n'est créé que lorsque le CDC de son cœur est validé.**
 
 ```text
@@ -153,6 +156,16 @@ pnpm test:e2e:auth-service
 pnpm test:e2e:auth-service:isolated
 pnpm test:e2e:auth-service:maildev
 pnpm build:auth-service
+pnpm dev:customer-portal
+pnpm build:customer-portal
+pnpm lint:customer-portal
+pnpm typecheck:customer-portal
+pnpm test:customer-portal
+pnpm dev:staff-portal
+pnpm build:staff-portal
+pnpm lint:staff-portal
+pnpm typecheck:staff-portal
+pnpm test:staff-portal
 pnpm start:auth-service
 pnpm auth:keygen
 pnpm db:auth-service:generate
@@ -160,7 +173,7 @@ pnpm db:auth-service:migrate:dev
 pnpm db:auth-service:migrate:deploy
 ```
 
-Les commandes racine fournissent les alias ciblés par workspace (`build:auth-service`, `start:auth-service`, `db:auth-service:*`, `test:*:auth-service`). Les scripts `build`, `dev`, `lint`, `typecheck` et `test` restent dans le manifest de chaque workspace car Turbo les appelle directement.
+Les commandes racine fournissent les alias ciblés par workspace, par exemple `build:customer-portal`, `build:staff-portal`, `dev:staff-portal`, `lint:staff-portal`, `typecheck:staff-portal` et `test:staff-portal`, ainsi que les commandes d'`auth-service`. Les scripts `build`, `dev`, `lint`, `typecheck` et `test` restent dans le manifest de chaque workspace car Turbo les appelle directement.
 
 Pour `auth-service`, copier `.env.example` vers `.env`, renseigner l'URL PostgreSQL et les clés runtime, puis démarrer avec `pnpm start:auth-service`. Le générateur ciblé est également exécuté automatiquement par les commandes de démarrage et de migration.
 

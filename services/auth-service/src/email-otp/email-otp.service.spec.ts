@@ -30,15 +30,16 @@ describe('EmailOtpService', () => {
       expiresInMinutes: 5,
     });
 
-    expect(sentMessages).toEqual([
-      {
-        from: 'no-reply@kgpay.local',
-        to: 'customer@example.com',
-        subject: 'Votre code de sécurité KG Pay',
-        text: expect.stringContaining('pour vous connecter à votre compte'),
-      },
-    ]);
+    expect(sentMessages).toHaveLength(1);
+    expect(sentMessages.at(0)).toMatchObject({
+      from: 'no-reply@kgpay.local',
+      to: 'customer@example.com',
+      subject: 'Votre code de sécurité KG Pay',
+      text: expect.stringContaining('pour vous connecter à votre compte'),
+      html: expect.stringContaining('KG Pay'),
+    });
     expect(sentMessages.at(0)?.text).toContain('482731');
+    expect(sentMessages.at(0)?.html).toContain('482731');
   });
 
   it('sends an English password recovery code', async () => {
@@ -54,6 +55,7 @@ describe('EmailOtpService', () => {
       to: 'staff@example.com',
       subject: 'Your KG Pay security code',
       text: expect.stringContaining('reset your password'),
+      html: expect.stringContaining('reset your password'),
     });
   });
 

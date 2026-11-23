@@ -231,6 +231,7 @@ describeMaildev('Auth API (real SMTP through Maildev)', () => {
       .expect(202);
 
     const invitationToken = await maildev.waitForInvitationToken(staffEmail);
+
     await api
       .post('/auth/invitations/accept')
       .send({ token: invitationToken, password: staffPassword })
@@ -338,53 +339,113 @@ class MaildevMcpClient {
 
   async waitForOtp(to: string, purpose: RegExp): Promise<string> {
     const email = await this.waitForMessage(to, purpose);
-    const code = email.match(
-      /(?:Use code|Utilisez le code)\s+(\d{1,12})\b/i,
-    )?.[1];
+    const readableEmail = this.toReadableEmailText(email);
+
+    const code =
+      readableEmail.match(
+        /(?:Use this code to|Utilisez ce code pour)[\s\S]{0,500}?(?:^|\n)\s*(\d{4,12})\s*(?=\n|$)/im,
+      )?.[1] ??
+      readableEmail.match(/(?:Use code|Utilisez le code)\s+(\d{4,12})\b/i)?.[1];
+
     if (!code) {
       throw new Error('The matching Maildev message did not contain an OTP.');
     }
+
     return code;
   }
 
   async waitForInvitationToken(to: string): Promise<string> {
     const email = await this.waitForMessage(
       to,
-      /POST \/auth\/invitations\/accept\s*:\s*[\s\S]*?\.\s*(?:It expires|Il expire)/i,
+      /One-time token|Jeton à usage unique|Jeton\s*:/i,
     );
-    const token = email.match(
-      /POST \/auth\/invitations\/accept\s*:\s*([\s\S]*?)\s*\.\s*(?:It expires|Il expire)/i,
-    )?.[1];
-    if (!token) {
-      throw new Error(
-        'The Maildev invitation message did not contain a token.',
+
+    const readableEmail = this.toReadableEmailText(email);
+
+    const lines = readableEmail
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    // Format texte : Jeton: abc123
+    for (const line of lines) {
+      const inlineMatch = line.match(
+        /^(?:One-time token|Jeton à usage unique|Jeton)\s*:\s*([A-Za-z0-9._~-]+)$/i,
       );
+
+      if (inlineMatch) {
+        return inlineMatch[1];
+      }
     }
-    return token.trim();
+
+    // Format HTML : libellé sur une ligne, jeton sur la suivante.
+    for (let i = 0; i < lines.length; i++) {
+      if (
+        /^(?:One-time token|Jeton à usage unique|Jeton)\s*:?\s*$/i.test(
+          lines[i],
+        )
+      ) {
+        const candidate = lines[i + 1];
+
+        if (candidate && /^[A-Za-z0-9._~-]+$/.test(candidate)) {
+          return candidate;
+        }
+      }
+    }
+
+    throw new Error(
+      'The Maildev invitation message did not contain a valid token.',
+    );
   }
 
   private async waitForMessage(to: string, purpose: RegExp): Promise<string> {
     const deadline = Date.now() + 10_000;
     let inspectedCount = 0;
+
     while (Date.now() < deadline) {
       const search = await this.callTool('maildev_search_emails', {
         to,
         limit: 10,
       });
+
       const ids = [...search.matchAll(/^ID:\s*(\S+)/gm)].map(([, id]) => id);
+
       for (const id of ids) {
         if (this.inspectedMessageIds.has(id)) continue;
+
         this.inspectedMessageIds.add(id);
         inspectedCount += 1;
+
         const email = await this.callTool('maildev_get_email', { id });
-        if (purpose.test(email)) return email;
+
+        if (purpose.test(email)) {
+          return email;
+        }
       }
+
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
     throw new Error(
       `No matching Maildev message arrived after inspecting ${inspectedCount} messages.`,
     );
+  }
+
+  private toReadableEmailText(email: string): string {
+    return email
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:p|div|tr|td|th|li|h[1-6])\s*>/gi, '\n')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/\r\n/g, '\n')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   }
 
   async deleteEmailsTo(to: string): Promise<void> {

@@ -223,6 +223,117 @@ export interface SessionSummary {
   userAgent: string | null;
 }
 
+export type IdentityStatus =
+  | "PENDING_VERIFICATION"
+  | "PENDING_INVITATION"
+  | "ACTIVE"
+  | "SUSPENDED"
+  | "DISABLED";
+
+export interface AdminIdentity {
+  id: string;
+  subjectType: SubjectType;
+  email: string;
+  phone: string | null;
+  status: IdentityStatus;
+  emailVerifiedAt: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
+  roles: string[];
+}
+
+export interface AdminIdentityListResponse {
+  items: AdminIdentity[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
+export interface AdminRole {
+  code: string;
+  name: string;
+  builtIn: boolean;
+  permissions: string[];
+}
+
+export interface AdminAccessEvent {
+  id: string;
+  identityId: string | null;
+  eventType: string;
+  result: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  correlationId: string;
+  occurredAt: string;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface AdminAccessReviewEntry {
+  id: string;
+  email: string;
+  status: IdentityStatus;
+  lastLoginAt: string | null;
+  createdAt: string;
+  roles: string[];
+}
+
+export interface AcceptInvitationRequest {
+  token: string;
+  password: string;
+}
+
+export interface CreateStaffInvitationRequest {
+  email: string;
+  phone: string;
+  roles: string[];
+}
+
+export interface CreateCustomRoleRequest {
+  code: string;
+  name: string;
+  permissions: string[];
+}
+
+export interface AssignRoleRequest {
+  roleCode: string;
+}
+
+export const acceptInvitationSchema = yup.object({
+  token: yup.string().required("validation.invitation.required"),
+  password: createNewPasswordSchema(),
+});
+
+export const createStaffInvitationSchema = yup.object({
+  email: emailSchema,
+  phone: phoneSchema,
+  roles: yup
+    .array(yup.string().required())
+    .min(1, "validation.roles.required")
+    .max(20, "validation.roles.tooMany")
+    .required("validation.roles.required"),
+});
+
+export const createCustomRoleSchema = yup.object({
+  code: yup
+    .string()
+    .matches(/^[a-z][a-z0-9-]{1,39}$/, "validation.role.code")
+    .required("validation.role.code"),
+  name: yup
+    .string()
+    .trim()
+    .min(2, "validation.role.name")
+    .max(80, "validation.role.name")
+    .required("validation.role.name"),
+  permissions: yup
+    .array(yup.string().required())
+    .max(50, "validation.role.permissions")
+    .required(),
+});
+
+export const assignRoleSchema = yup.object({
+  roleCode: yup.string().required("validation.role.required"),
+});
+
 export interface ApiErrorBody {
   statusCode: number;
   message: string | string[];

@@ -906,6 +906,7 @@ export class AuthService {
       rawToken,
       Math.ceil(this.config.invitationTtlSeconds / 3600),
       locale,
+      this.config.staffPortalUrl,
     );
     return {
       message: INVITATION_MESSAGE,
@@ -982,6 +983,7 @@ export class AuthService {
       rawToken,
       Math.ceil(this.config.invitationTtlSeconds / 3600),
       locale,
+      this.config.staffPortalUrl,
     );
     return { message: INVITATION_MESSAGE, invitationId };
   }
