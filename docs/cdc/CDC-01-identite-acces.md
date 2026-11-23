@@ -421,6 +421,7 @@ Journaux structurés (JSON) avec `correlationId`. Métriques minimales : connexi
 | 13  | Récupération après perte d'accès à la boîte e-mail servant au MFA.                  | [POINT OUVERT] Définir une procédure vérifiable et auditée avant la mise en production ; un e-mail vers la boîte inaccessible n'est pas une récupération.                                                              |
 | 14  | Protection de la boîte e-mail et risque d'interception/compromission.               | [POINT OUVERT] L'OTP e-mail est moins indépendant qu'un authenticator ; définir ses limites et contrôles complémentaires avant la production.                                                                          |
 | 15  | Fournisseur SMTP de production, TLS et gestion/rotation des secrets d'envoi.        | [POINT OUVERT] SMTP générique est prévu ; Maildev est réservé au développement local. Les paramètres secrets sont injectés à l'exécution, jamais versionnés.                                                           |
+| 16  | Conception visuelle des courriels backend d'identité (OTP et invitation).           | [POINT OUVERT] Définir et valider la présentation, le contenu français/anglais et le format des messages pendant l'implémentation frontend. L'implémentation actuelle envoie du texte simple sans gabarit visuel HTML. |
 
 ### 10.1 Informations à obtenir avant l'implémentation
 
