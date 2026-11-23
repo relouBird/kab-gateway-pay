@@ -1,5 +1,16 @@
 # Journal — CDC-01 — 2026-11-23
 
+## Mise à jour — Document de reprise frontend
+
+- **Objectif :** transmettre les travaux restants après la mise en place du portail client.
+- **Statut :** terminé pour la transmission ; recette et portail personnel restent à faire.
+- **Résumé :** état du socle, validations effectuées et non effectuées, étapes prioritaires, commandes et points ouverts.
+- **Chemins modifiés :** `docs/REPRISE-CDC-01-FRONTEND.md`, `docs/journal/2026-11-23/CDC-01-identite-acces.md`.
+- **Exigences/sections concernées :** CDC-01 §4.6, IAM-F-22 à IAM-F-25, §8.10 et critères de recette ; ADR-002 D2/D3.
+- **Validations :** tests et build non exécutés — transmission documentaire uniquement.
+- **Points ouverts :** recette navigateur avec le backend et Maildev, accessibilité, portail personnel et points ouverts du CDC.
+- **Suite attendue :** reprendre selon les priorités du document et actualiser l'état documentaire après recette.
+
 ## Mise à jour — Frontend client `customer-portal`
 
 - **Objectif :** clôturer côté frontend client le CDC-01 (IAM-F-22, IAM-F-23, IAM-F-24 ; IAM-F-25 non applicable) en consommant l'`auth-service` existant.
