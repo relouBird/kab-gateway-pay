@@ -1,6 +1,7 @@
 import type { SVGProps } from "react";
 
 const paths = {
+  home: "M3 10.5 12 3l9 7.5V21H3z",
   check: "M5 12.5l4.5 4.5L19 7.5",
   alert:
     "M12 8v5m0 3.5v.01M10.3 4.6L3.4 17a2 2 0 001.7 3h13.8a2 2 0 001.7-3L13.7 4.6a2 2 0 00-3.4 0z",

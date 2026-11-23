@@ -126,9 +126,49 @@ export const en = {
   common: {
     skipToContent: "Skip to content",
     language: "Language",
+    primaryNavigation: "Main navigation",
+    retry: "Try again",
+    theme: {
+      label: "Theme",
+      dark: "A · Dark — Thread bloom",
+      light: "B · Light — Soft light",
+      darkMode: "Dark",
+      lightMode: "Light",
+    },
     showPassword: "Show password",
     hidePassword: "Hide password",
     reference: "Reference",
     loading: "Loading…",
+  },
+  connected: {
+    greeting: "Welcome",
+    staffLabel: "Staff space",
+    accountDescription: "Secure access",
+  },
+  connection: {
+    "not-found": {
+      eyebrow: "Error 404",
+      title: "This page cannot be found.",
+      message:
+        "This address no longer exists or has moved. Return to your KG Pay space.",
+      action: "Back to sign in",
+    },
+    offline: {
+      eyebrow: "Offline",
+      title: "No network for now.",
+      message:
+        "Your device is no longer connected to the internet. You can continue when the connection returns.",
+    },
+    restored: {
+      eyebrow: "Connection restored",
+      title: "You’re back. Everything is in place.",
+      message:
+        "Your connection is working again. Reload the page to continue safely.",
+      action: "Reload the page",
+    },
+    paymentTitle: "Was a payment in progress?",
+    paymentNote:
+      "It may have completed before the connection dropped. Check its status before trying again.",
+    waiting: "Waiting for a network…",
   },
 };

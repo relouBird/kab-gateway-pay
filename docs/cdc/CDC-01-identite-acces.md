@@ -50,7 +50,7 @@ Interfaces web responsive correspondantes : inscription client, vérification du
 - Authentification des API tierces (clés d'API B2B) [RÉFÉRENTIEL : piste future].
 - Authentification des partenaires externes (leurs callbacks relèvent du cœur 4).
 - Constitution complète du dossier client, dépôt et examen interne des pièces KYC, décision d'activation client et activation partenaire (cœur 2).
-- PWA, mode hors ligne, applications mobiles natives et API publique d'intégration.
+- PWA installable et opérations métier hors ligne (hors shell statique et états réseau définis par IAM-F-26), applications mobiles natives et API publique d'intégration.
 
 ### 2.3 Frontières : ce que ce cœur ne fait pas [RÉFÉRENTIEL]
 
@@ -141,6 +141,7 @@ Un `GLOBAL_SUPER_ADMIN` désactive l'identité : toutes ses sessions sont révoq
 - Les interfaces distinguent l'état de l'identité de celui du dossier client. Elles ne présentent pas une identité active comme une preuve de dossier client validé.
 - Les erreurs d'identifiants restent uniformes afin de ne pas révéler l'existence d'un compte. Les textes d'interface et messages d'erreur sont disponibles en français et en anglais.
 - Les interactions sont utilisables sur mobile et desktop. Le mode PWA est une extension ultérieure, pas une condition du parcours d'authentification initial.
+- **[DÉCISION — 23 novembre 2026]** Les deux portails présentent leurs propres vues lorsque la page est introuvable, que le réseau est indisponible ou qu'il est rétabli. Après rétablissement, l'utilisateur déclenche explicitement le rechargement ; aucune opération financière n'est rejouée automatiquement.
 
 ## 5. Exigences fonctionnelles
 
@@ -173,6 +174,7 @@ Priorités : **P0** = indispensable V1, **P1** = V1 si possible, **P2** = après
 | IAM-F-23 | Présentation bilingue des parcours d'authentification (français/anglais) et adaptation mobile/desktop.                                                         | P0   | Les libellés, erreurs et instructions MFA sont disponibles dans les deux langues et restent utilisables sur petit et grand écran.                                                                                                                                      |
 | IAM-F-24 | Affichage distinct de l'identité et du dossier client.                                                                                                         | P0   | Une identité `ACTIVE` n'est jamais présentée comme une preuve de validation du dossier ; le statut client est fourni par le cœur 2.                                                                                                                                    |
 | IAM-F-25 | Pour une action d'interface explicitement annulable, attendre deux secondes avant d'envoyer la requête et permettre l'annulation durant ce délai.              | P1   | Annuler avant la fin du délai n'envoie aucune requête ; après délai, l'interface n'affiche la réussite qu'après réponse serveur et affiche explicitement toute erreur. Les actions de sécurité et financières ne sont concernées qu'après validation de leur CDC.      |
+| IAM-F-26 | Présenter les états de page introuvable et de perte/rétablissement du réseau dans les deux portails.                                                              | P1   | Une URL inconnue affiche une page KG Pay bilingue. Hors connexion, le portail affiche sa page dédiée ; au retour du réseau, il propose explicitement le rechargement. Le Service Worker ne met en cache que le shell et les ressources statiques, jamais les API, données authentifiées ou financières. |
 
 ## 6. Règles métier
 
@@ -403,6 +405,19 @@ Journaux structurés (JSON) avec `correlationId`. Métriques minimales : connexi
 - **Recette staff :** lint, typecheck, tests ciblés et build du workspace passent. Le parcours navigateur authentifié contre `auth-service`/PostgreSQL/Maildev n'a pas été exécuté.
 - **[POINT OUVERT — §10, point 16] Courriels :** les gabarits HTML et la copie bilingue ne sont pas encore conçus ; l'URL de destination pour l'invitation doit être validée avant d'ajouter un lien dans le courriel.
 - **Écarts/limites connus :** pas de `GET /auth/me` (l'e-mail courant n'est pas affiché) ; le changement de mot de passe révoque toutes les sessions, le portail renvoie donc vers la connexion ; les messages serveur ne sont pas affichés, les erreurs sont traduites côté front selon statut et contexte ; la récupération d'un CUSTOMER ayant perdu l'accès à son e-mail reste du ressort du support (point ouvert).
+- **IAM-F-26 — implémentation (23 novembre 2026) :** les layouts d'authentification
+  proposent A sombre/B clair ; l'espace connecté reprend le shell responsive de la
+  référence (navigation latérale sur grand écran, navigation basse sur mobile,
+  en-tête et contrôle Clair/Sombre). Les deux modes utilisent le `ThemeProvider`
+  partagé dans chaque application : le choix explicite est mémorisé sous
+  `kgpay.theme`, sinon le système d'exploitation fournit la préférence initiale.
+  Les routes et droits existants sont conservés ; la navigation STAFF n'affiche
+  l'administration qu'à `GLOBAL_SUPER_ADMIN`. Les données et actions financières
+  fictives de la référence ne sont pas reprises. Un Service Worker de chaque
+  application met en cache uniquement la page d'entrée et les assets statiques
+  nécessaires à son shell hors ligne. Les données d'identité/financières et les
+  réponses API ne sont pas mises en cache ; les opérations ne sont ni mises en
+  file ni rejouées.
 
 ## 9. Cas limites et exceptions
 

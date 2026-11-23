@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter } from "react-router";
 import { AuthLayout } from "../components/layout/AuthLayout";
 import { StaffLayout } from "../components/layout/StaffLayout";
 import {
@@ -12,6 +12,7 @@ import { ForgotPasswordPage } from "../pages/auth/ForgotPasswordPage";
 import { InvitationPage } from "../pages/auth/InvitationPage";
 import { LoginPage } from "../pages/auth/LoginPage";
 import { MfaPage } from "../pages/auth/MfaPage";
+import { NotFoundPage } from "../pages/NotFoundPage";
 import { StaffSessionsPage } from "../pages/StaffSessionsPage";
 
 export const appRoutes = createBrowserRouter([
@@ -48,5 +49,5 @@ export const appRoutes = createBrowserRouter([
       },
     ],
   },
-  { path: "*", element: <Navigate to="/login" replace /> },
+  { path: "*", element: <NotFoundPage /> },
 ]);

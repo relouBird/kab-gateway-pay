@@ -43,8 +43,5 @@ export const appRoutes: RouteObject[] = [
       },
     ],
   },
-  {
-    element: <AuthLayout />,
-    children: [{ path: "*", element: <NotFoundPage /> }],
-  },
+  { path: "*", element: <NotFoundPage /> },
 ];

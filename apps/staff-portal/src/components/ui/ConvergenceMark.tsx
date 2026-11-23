@@ -18,13 +18,13 @@ export function ConvergenceMark({ className }: { className?: string }) {
         cx="160"
         cy="160"
         r="148"
-        stroke="#F6F1E7"
+        stroke="currentColor"
         strokeOpacity=".28"
         strokeWidth="1.5"
       />
       <g
         clipPath="url(#convergence-clip)"
-        stroke="#F6F1E7"
+        stroke="currentColor"
         strokeWidth="1.5"
         strokeOpacity=".55"
       >

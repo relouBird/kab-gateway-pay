@@ -10,8 +10,20 @@ export const fr = {
     showPassword: "Afficher le mot de passe",
     hidePassword: "Masquer le mot de passe",
     reference: "Référence :",
+    theme: {
+      label: "Thème",
+      dark: "A · Sombre — Fleur de fils",
+      light: "B · Clair — Clair doux",
+      darkMode: "Sombre",
+      lightMode: "Clair",
+    },
   },
   brand: { tagline: "Plusieurs sources. Un seul accès." },
+  connected: {
+    greeting: "Bienvenue",
+    customerLabel: "Espace client",
+    accountDescription: "Accès sécurisé",
+  },
   fields: {
     email: "Adresse e-mail",
     phone: "Téléphone",
@@ -225,6 +237,32 @@ export const fr = {
     title: "Page introuvable",
     subtitle: "Cette page n'existe pas ou a été déplacée.",
     back: "Retour à l'accueil",
+  },
+  connection: {
+    "not-found": {
+      eyebrow: "Erreur 404",
+      title: "Cette page est introuvable.",
+      message:
+        "Cette adresse n’existe plus ou a été déplacée. Revenez à votre espace KG Pay.",
+      action: "Retour à la connexion",
+    },
+    offline: {
+      eyebrow: "Hors connexion",
+      title: "Plus de réseau pour le moment.",
+      message:
+        "Votre appareil n’est plus connecté à Internet. Dès que le réseau revient, vous pourrez reprendre.",
+    },
+    restored: {
+      eyebrow: "Connexion rétablie",
+      title: "De retour. Tout est en place.",
+      message:
+        "Votre connexion fonctionne de nouveau. Rechargez la page pour continuer en toute sécurité.",
+      action: "Recharger la page",
+    },
+    paymentTitle: "Un paiement était en cours ?",
+    paymentNote:
+      "Il a peut-être abouti avant la coupure. Ne le relancez pas avant d’avoir consulté son suivi.",
+    waiting: "En attente du réseau…",
   },
 };
 

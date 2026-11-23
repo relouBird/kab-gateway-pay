@@ -65,3 +65,14 @@
 - **Validations :** `pnpm typecheck:staff-portal`, `pnpm lint:staff-portal`, `pnpm test:staff-portal` (2 tests), `pnpm build:staff-portal` et `pnpm build:customer-portal` réussis ; Prettier ciblé exécuté. La page login STAFF a été vérifiée à 320, 360, 600, 840 et 1120 px sans débordement. `localhost:3000/auth/csrf` a refusé la connexion ; les vues STAFF authentifiées n'ont pas pu être recettées.
 - **Points ouverts :** le chunk STAFF de 521,72 kB dépasse le seuil d'avertissement de 500 kB ; l'administration authentifiée doit être vérifiée contre `auth-service`.
 - **Suite attendue :** démarrer les services locaux, vérifier les parcours d'administration et sessions sur desktop/mobile, puis réévaluer le découpage du bundle dans une tâche dédiée si le seuil reste problématique.
+
+## Suite — alignement visuel et shell hors ligne
+
+- **Objectif :** appliquer les maquettes d'authentification, d'espace connecté et d'état réseau aux deux portails, sans fusionner leurs parcours ni leur navigation.
+- **Statut :** implémentation ciblée terminée ; la stratégie d'offline limitée est documentée ; la vérification HTTPS en hébergement reste ouverte.
+- **Résumé :** layouts correspondants dans les deux applications, thème A sombre/B clair avec préférence de système par défaut et stockage `kgpay.theme`, page 404 dédiée et vues hors ligne/rétabli. Les Service Workers mettent en cache le seul shell statique, sans appels API ni données privées/financières ; aucune opération n'est mise en attente ou rejouée. Le comportement ne constitue pas une PWA installable.
+- **Chemins modifiés :** `apps/customer-portal/**`, `apps/staff-portal/**`, `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`, `docs/cdc/CDC-01-identite-acces.md`, `docs/REPRISE-CDC-01-FRONTEND.md`.
+- **Exigences/sections concernées :** ADR-002 D7, §6 et §13 ; CDC-01 IAM-F-22/23/26, §4.6 et §8.11.
+- **Validations :** typecheck, lint, tests et builds des deux portails réussis ; contrôles navigateur responsive 320–1120 px, choix du thème et transitions des états réseau réussis. En prévisualisation de production, les Service Workers sont actifs et le cache statique sert le CSS pendant une coupure simulée ; aucune API n'est en cache. La navigation complète hors ligne reste à recetter, l'outil de navigateur rétablissant `navigator.onLine` après une navigation.
+- **Points ouverts :** HTTPS et base path de l'hébergement cible pour la portée du Service Worker ; navigation/rechargement hors ligne et recette authentifiée du shell connecté.
+- **Suite attendue :** déployer/servir chaque portail sous le chemin prévu, vérifier navigation hors ligne après chargement en ligne, puis compléter la recette connectée.

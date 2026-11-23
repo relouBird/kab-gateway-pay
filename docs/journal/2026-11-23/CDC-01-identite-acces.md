@@ -121,3 +121,58 @@
 - **Validations :** `git diff --check` — réussi. Tests et build non exécutés — changements documentaires uniquement.
 - **Points ouverts :** le choix de l'identité visuelle, du contenu final et du format des courriels reste à effectuer pendant l'implémentation frontend ; la recette complète du CDC-01 reste partielle.
 - **Suite attendue :** l'agent frontend peut démarrer à partir du CDC-01 et de la collection versionnée ; décider le design des courriels avec le porteur du projet avant de finaliser leur présentation.
+
+## Suite — layouts, thèmes et états réseau
+
+- **Objectif :** intégrer les trois maquettes de `docs/finetuning/` aux deux portails et permettre l'affichage KG Pay en cas de perte réseau.
+- **Statut :** layouts, préférences de thème, routes 404 et états réseau implémentés ; contrôles ciblés réussis. La recette du Service Worker en HTTPS reste ouverte.
+- **Résumé :** les layouts d'authentification et connecté ont une même direction visuelle dans les deux applications. A correspond au thème sombre, B au clair ; une préférence `kgpay.theme` est mémorisée et, sans choix, `prefers-color-scheme` est appliqué. Les pages 404, hors ligne et rétabli existent en FR/EN. Chaque Service Worker ne met en cache que le shell et les ressources statiques, sans réponse API, données authentifiées/financières ni rejouabilité d'action.
+- **Chemins modifiés :** `apps/customer-portal/**` (layouts, thèmes, états réseau, routes, Service Worker et tests), `apps/staff-portal/**` (mêmes surfaces, navigation propre au STAFF), `docs/cdc/CDC-01-identite-acces.md`, `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`, `docs/REPRISE-CDC-01-FRONTEND.md`.
+- **Exigences/sections concernées :** IAM-F-22, IAM-F-23, IAM-F-26, CDC-01 §4.6, §5, §8.11 ; ADR-002 D7 et §6/§13.
+- **Validations réellement exécutées :**
+  - `pnpm --filter customer-portal typecheck`, `lint`, `test` — réussis ; 29 tests.
+  - `pnpm --filter staff-portal typecheck`, `lint`, `test` — réussis ; 6 tests.
+  - Builds des deux portails — réussis ; avertissement du bundle supérieur à 500 kB (environ 528 kB par application).
+  - Contrôle navigateur login et états 404/offline/rétabli aux largeurs 320, 360, 600, 840 et 1120 px — aucun débordement horizontal ; sélection et persistance de A/B vérifiées.
+  - Prévisualisations de production des deux applications : Service Workers installés et actifs, shell/ressources statiques présents dans Cache Storage, aucune URL API en cache ; état hors ligne déclenché et CSS statique encore servi depuis le cache durant la simulation de coupure.
+  - Le rechargement/navigation complète après coupure n'a pas pu être validé de façon fiable : l'outil navigateur rapporte `navigator.onLine=true` après une navigation hors ligne simulée. La recette de ce cas reste à faire dans un navigateur cible.
+  - Recette authentifiée de l'administration — non exécutée, `auth-service` local indisponible.
+- **Points ouverts :** vérifier portée et navigation/rechargement hors ligne des Service Workers sous l'URL HTTPS de production ; auditer les écrans connectés par rôle avec les services locaux. Aucune page de paiement ou donnée de démonstration de la maquette n'a été ajoutée.
+- **Suite attendue :** vérifier le rechargement de route hors ligne avec l'hébergement cible, puis recetter les layouts connectés avec `auth-service`.
+
+## Suite — reprise du design React de connexion
+
+- **Objectif :** appliquer aux parcours d'authentification CUSTOMER et STAFF le design du projet React fourni dans `master/kg-pay-login`.
+- **Statut :** terminé pour les deux layouts et contrôles disponibles ; parcours backend de connexion/OTP non recettés, car `auth-service` local n'est pas accessible depuis le navigateur.
+- **Résumé :** reprise de la composition de référence (marque géométrique KG Pay, rosaces A/B, slogan, typographie, grille responsive, contrôles de langue et thème, carte du formulaire). Le thème A reste sombre et B clair ; le `ThemeProvider` existant conserve le choix et la préférence système initiale. Les routes, formulaires, validations, liens, erreurs, appels API et flux OTP existants ne sont pas remplacés.
+- **Chemins modifiés :** `apps/customer-portal/src/components/layout/AuthLayout.tsx`, `AuthLayout.css`, `AuthBrandMark.tsx`, `AuthBackgroundArt.tsx`, `AuthLayout.test.tsx` ; mêmes fichiers dans `apps/staff-portal/src/components/layout/`.
+- **Exigences/sections concernées :** CDC-01 §4.6, IAM-F-22 et IAM-F-23 ; le cadre visuel est repris sans modifier les contrats fonctionnels ou API.
+- **Validations réellement exécutées :**
+  - CUSTOMER : typecheck et lint réussis ; 31 tests réussis.
+  - STAFF : typecheck et lint réussis ; 8 tests réussis.
+  - Builds de production réussis pour les deux applications ; avertissement du bundle JS supérieur à 500 kB (environ 532 kB).
+  - Contrôle navigateur des pages de connexion aux largeurs 320, 360, 600, 840 et 1120 px ; pas de débordement horizontal constaté.
+  - Contrôle navigateur des thèmes A et B et de leurs couleurs fond attendues ; contrôle FR/EN sur les deux parcours.
+  - Envoi réel de formulaire et validation OTP — non exécutés, service local inaccessible/CORS non configuré pour les ports de vérification.
+  - `pnpm exec prettier --check` sur les fichiers auth modifiés et le journal ; `git diff --check` — réussis.
+- **Points ouverts :** le branchement complet à `auth-service` doit être recetté sur les origines configurées ; les pages d'authentification sont prêtes à être validées visuellement par le porteur.
+- **Suite attendue :** obtenir la validation du design auth avant de poursuivre les ajustements du shell connecté et des états réseau.
+
+## Suite — adaptation du shell connecté
+
+- **Objectif :** reprendre dans CUSTOMER et STAFF la présentation de l'espace connecté de la référence React, sans remplacer les parcours métier existants.
+- **Statut :** intégré ; tests, lint, typecheck et builds passent. La validation visuelle des pages authentifiées avec `auth-service` reste à faire.
+- **Résumé :** navigation latérale sur grand écran et basse sur mobile, état de navigation actif, en-tête daté, logotype KG Pay, sélecteur connecté Clair/Sombre, langue et déconnexion. Les routes CUSTOMER sont conservées ; le lien STAFF d'administration reste conditionné à `GLOBAL_SUPER_ADMIN`, et les gardes backend restent inchangés. Le thème s'appuie sur le `ThemeProvider` et garde la préférence système comme valeur initiale. Aucune identité, opération, solde ni action financière fictive de la référence n'est reprise.
+- **Chemins modifiés :** `apps/customer-portal/src/components/layout/AppLayout.tsx`, `AppLayout.test.tsx`, `ConnectedLayout.css`, `apps/customer-portal/src/components/ui/ConnectedThemeSwitcher.tsx`, `Icon.tsx`, locales `fr.ts`/`en.ts` ; mêmes fichiers pertinents dans `apps/staff-portal` avec `StaffLayout.tsx`/`StaffLayout.test.tsx` ; `docs/cdc/CDC-01-identite-acces.md`, `docs/REPRISE-CDC-01-FRONTEND.md`.
+- **Exigences/sections concernées :** CDC-01 §8.11, IAM-F-22 et IAM-F-26 ; aucune nouvelle route ni décision d'architecture.
+- **Validations réellement exécutées :**
+  - `pnpm --filter customer-portal test` — réussi, 11 fichiers et 33 tests.
+  - `pnpm --filter staff-portal test` — réussi, 5 fichiers et 9 tests.
+  - `pnpm --filter customer-portal lint` et `typecheck` — réussis sans avertissement.
+  - `pnpm --filter staff-portal lint` et `typecheck` — réussis sans avertissement.
+  - `pnpm --filter customer-portal build` et `pnpm --filter staff-portal build` — réussis ; Vite signale pour chacun un chunk JavaScript d'environ 534 kB, au-dessus du seuil d'avertissement de 500 kB.
+  - `pnpm exec prettier --check` sur les fichiers source ciblés et la reprise frontend — réussi. Le contrôle global du CDC signale des écarts de formatage préexistants dans ce document ; aucune réécriture complète du CDC n'a été appliquée.
+  - `git diff --check` sur les chemins concernés — réussi ; les deux feuilles `ConnectedLayout.css` sont identiques.
+  - Vérification visuelle responsive des pages authentifiées — non exécutée, faute de session locale `auth-service` ; les tests vérifient le rendu des deux navigations, les routes actives et la persistance du thème.
+- **Points ouverts :** faire valider visuellement le shell par le porteur ; recetter ensuite les pages connectées avec `auth-service` aux tailles responsive prévues et compléter l'audit d'accessibilité.
+- **Suite attendue :** recueillir les retouches du porteur avant de poursuivre les autres vues connectées et les gabarits de courriel.

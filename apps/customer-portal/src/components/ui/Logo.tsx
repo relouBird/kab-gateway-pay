@@ -13,9 +13,19 @@ export function Logo({ tone, className }: LogoProps) {
     return <img className={classes} src={DARK} alt="KG Pay" height={40} />;
   }
   return (
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcSet={DARK} />
-      <img className={classes} src={LIGHT} alt="KG Pay" height={40} />
-    </picture>
+    <>
+      <img
+        className={`${classes} logo--light`}
+        src={LIGHT}
+        alt="KG Pay"
+        height={40}
+      />
+      <img
+        className={`${classes} logo--dark`}
+        src={DARK}
+        alt="KG Pay"
+        height={40}
+      />
+    </>
   );
 }
