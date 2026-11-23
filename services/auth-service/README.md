@@ -44,6 +44,7 @@ Le `.env` racine ignoré par Git est l'unique fichier de configuration à modifi
 
 - `DATABASE_URL__AUTH_SERVICE` avec l'URL PostgreSQL et les identifiants configurés sur la machine ; encoder les caractères spéciaux du mot de passe selon le format URL.
 - Les paramètres `SMTP_*__AUTH_SERVICE` si Maildev n'écoute pas à l'adresse/au port par défaut du modèle.
+- `STAFF_PORTAL_URL__AUTH_SERVICE` est optionnelle : si elle est renseignée, l'e-mail d'invitation inclut un lien vers `/accept-invitation`; sinon, l'e-mail conserve le jeton et le formulaire reste accessible manuellement.
 
 Générer les clés locales :
 
@@ -79,7 +80,7 @@ pnpm start:auth-service
 
 Le service écoute sur `http://localhost:3000`. Swagger est disponible sur [`http://localhost:3000/docs`](http://localhost:3000/docs) et son contrat OpenAPI JSON sur [`http://localhost:3000/docs-json`](http://localhost:3000/docs-json), en développement/test uniquement. La liveness `GET /health` ne nécessite ni authentification ni accès à la base une fois le service démarré.
 
-Maildev reçoit les messages sur `127.0.0.1:1025` et expose sa boîte de réception sur [`http://127.0.0.1:1080`](http://127.0.0.1:1080). Aucune authentification SMTP n'est configurée dans les fichiers versionnés.
+Maildev reçoit les messages sur `127.0.0.1:1025` et expose sa boîte de réception sur [`http://127.0.0.1:1080`](http://127.0.0.1:1080). Aucune authentification SMTP n'est configurée dans les fichiers versionnés. Les OTP (vérification, connexion, récupération et step-up) et les invitations STAFF sont envoyés en HTML et texte simple, en français ou en anglais. Le lien d'invitation n'est inclus que si `STAFF_PORTAL_URL__AUTH_SERVICE` est valide ; son absence n'empêche pas l'envoi.
 
 ## Essayer les parcours dans Swagger
 

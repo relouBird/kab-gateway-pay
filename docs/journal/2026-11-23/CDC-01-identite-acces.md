@@ -1,5 +1,59 @@
 # Journal — CDC-01 — 2026-11-23
 
+## Mise en œuvre — `staff-portal` et contrats d'administration
+
+- **Objectif :** couvrir les parcours frontend personnel et d'administration du cœur 1 selon le CDC-01.
+- **Statut :** portail implémenté et contrôles ciblés réussis ; recette backend/browser complète et gabarits de courriel restent à faire.
+- **Résumé :** création de `apps/staff-portal` (React/Vite) : connexion par mot de passe puis OTP obligatoire, renvoi OTP, acceptation d'invitation, récupération/réinitialisation de mot de passe, gestion des identités STAFF, invitations, rôles, suspension/réactivation/désactivation/déverrouillage, récupération d'e-mail STAFF avec step-up, journal/revue des accès et sessions propres. Les routes admin et preuves step-up viennent de `auth-service`; seuls les appels qui le nécessitent portent le jeton et le proof header. Access token conservé en mémoire, refresh par cookie/CSRF. FR/EN, logos/tokens fournis, états et formulaires responsive.
+- **Chemins modifiés :** `apps/staff-portal/**`, `packages/contracts/src/transport.ts`, `package.json`, `pnpm-lock.yaml`, `.env.example`, `README.md`, `docs/README.md`, `docs/REPRISE-CDC-01-FRONTEND.md`, `docs/cdc/CDC-01-identite-acces.md`, `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`, journaux CDC/ADR/BASE.
+- **Exigences/sections concernées :** CDC-01 §4.2-4.6, IAM-F-03/04/09-16/19/22-25, §8.10-8.11, §9 et §10.16 ; RP-17 ; ADR-002 D2/D3/D11.
+- **Validations réellement exécutées :**
+  - `pnpm install --lockfile-only` et `pnpm install --offline --frozen-lockfile` — réussis.
+  - `pnpm --filter staff-portal typecheck` — réussi.
+  - `pnpm --filter staff-portal lint` — réussi sans avertissement.
+  - `pnpm --filter staff-portal test` — réussi, 2 tests.
+  - `VITE_AUTH_API_URL__STAFF_PORTAL=http://localhost:3000 pnpm --filter staff-portal build` — réussi ; avertissement du bundle JavaScript à 511,76 kB (limite par défaut 500 kB).
+  - Serveur Vite local : `/login` répond HTTP 200 ; aucun débordement horizontal constaté à 320, 360, 600, 840 et 1120 px.
+  - `pnpm typecheck:staff-portal` via Turbo — non réussi lors du premier essai, la nouvelle clé `VITE_AUTH_API_URL__STAFF_PORTAL` n'étant pas encore disponible dans le `.env` local et Turbo filtrant la variable injectée ; les scripts du workspace ont ensuite été validés directement avec la configuration publique fournie au processus.
+  - Parcours authentifiés contre PostgreSQL/`auth-service`/Maildev, audit complet d'accessibilité et test responsive des pages admin — non exécutés : dépendances backend/recette non démarrées.
+- **Limites et points ouverts :** les courriels restent en texte simple. Ne pas finaliser leur HTML/copie ni inventer l'URL de destination avant validation du point ouvert §10.16. Le catalogue actuel ne permet pas de permissions personnalisées non-super-admin ; `GET /admin/identities` n'expose pas `lockedUntil` ; aucune route ne liste les sessions d'une autre identité.
+- **Suite attendue :** confirmer la direction graphique, les copies FR/EN et la destination des invitations, puis faire les gabarits; configurer `.env` local/CORS et effectuer la recette de bout en bout et l'audit d'accessibilité.
+
+## Suite — documentation et sessions self-service STAFF
+
+- **Objectif :** corriger l'état documentaire obsolète et garantir l'accès aux sessions propres pour tout membre STAFF, sans exposer l'administration.
+- **Statut :** terminé pour le changement ; recette authentifiée non exécutée.
+- **Résumé :** `GLOBAL_SUPER_ADMIN` est redirigé vers `/admin`, les autres identités STAFF vers `/my-sessions`. Le garde d'administration redirige également vers cette page et une identité `CUSTOMER` déjà authentifiée voit un refus avec une action de déconnexion, sans boucle de redirection. CDC-01, ADR-002, README et reprise distinguent maintenant administration et sessions self-service.
+- **Chemins modifiés :** `apps/staff-portal/src/App.tsx`, `README.md`, `docs/README.md`, `docs/REPRISE-CDC-01-FRONTEND.md`, `docs/cdc/CDC-01-identite-acces.md`, `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md` et journaux CDC/ADR/BASE.
+- **Exigences/sections concernées :** CDC-01 §4.4, §8.11 ; ADR-002 §12 ; accès aux sessions propres et séparation des droits d'administration.
+- **Validations réellement exécutées :**
+  - `pnpm --filter staff-portal run typecheck` — réussi.
+  - `pnpm --filter staff-portal run lint` — réussi sans avertissement.
+  - `pnpm --filter staff-portal run test` — réussi, 2 tests.
+  - `pnpm --filter staff-portal run build` — réussi ; avertissement du bundle JavaScript à 515,70 kB (> 500 kB).
+  - `pnpm exec prettier --check README.md docs/README.md apps/staff-portal/src/App.tsx docs/cdc/CDC-01-identite-acces.md docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md` — échec sur les deux documents CDC/ADR ; README, reprise, App et docs README vérifiés séparément lors du contrôle avant journal.
+  - `git diff --check` — réussi.
+- **Points ouverts :** parcours authentifiés contre `auth-service`/PostgreSQL/Maildev et audit visuel/accessibilité non exécutés ; les courriels restent bloqués par CDC-01 §10.16.
+- **Suite attendue :** tester les sessions avec plusieurs rôles STAFF et exécuter la recette de bout en bout après configuration locale ; arbitrer le contenu, l'identité visuelle et l'URL des courriels.
+
+## Suite — gabarits de courriels bilingues
+
+- **Objectif :** produire des courriels d'identité HTML et texte simple pour les parcours OTP CUSTOMER/STAFF et l'invitation STAFF.
+- **Statut :** gabarits implémentés en proposition ; copie finale et livraison réelle restent à valider.
+- **Résumé :** ajout d'un layout KG Pay original aux couleurs vert/sable/jaune, d'un rendu bilingue par finalité OTP et d'un gabarit d'invitation. Le jeton d'invitation reste présent même sans lien. `STAFF_PORTAL_URL__AUTH_SERVICE` est optionnelle, validée lorsqu'elle est fournie (HTTPS en production), et génère le lien vers `/accept-invitation`; son absence n'empêche pas l'envoi. Le template OTP reste commun aux clients et au personnel et ne contient pas de lien qui abandonnerait le défi en cours.
+- **Chemins modifiés :** `services/auth-service/src/email-otp/**`, `services/auth-service/src/config/auth.config.ts`, `services/auth-service/src/config/auth.config.spec.ts`, `services/auth-service/src/auth/auth.service.ts`, `services/auth-service/env.schema.json`, `.env.example`, README racine/service, `docs/README.md`, CDC-01, ADR-002, reprise frontend et journaux.
+- **Exigences/sections concernées :** CDC-01 §4.1-4.4, §8.7, §8.9-8.11 et §10.16 ; OTP et invitation STAFF.
+- **Validations réellement exécutées :**
+  - `pnpm env:build` — réussi.
+  - `pnpm --filter auth-service run typecheck` et `pnpm --filter auth-service run lint` — réussis.
+  - `pnpm test:auth-service` — réussi, 10 suites et 29 tests.
+  - `pnpm --filter auth-service run build` — réussi.
+  - `pnpm exec prettier --check` sur les fichiers source, tests, configuration et README ciblés — réussi.
+  - `git diff --check` — réussi.
+  - Recette SMTP réelle via Maildev et revue finale des copies — non exécutées dans cette reprise.
+- **Points ouverts :** confirmer la copie proposée ; définir la valeur de `STAFF_PORTAL_URL__AUTH_SERVICE` au déploiement ; exécuter la recette Maildev et vérifier le rendu sur clients mail.
+- **Suite attendue :** faire valider les copies FR/EN, configurer l'URL publique si disponible, puis vérifier les deux formats de chaque message via Maildev.
+
 ## Mise à jour — Document de reprise frontend
 
 - **Objectif :** transmettre les travaux restants après la mise en place du portail client.

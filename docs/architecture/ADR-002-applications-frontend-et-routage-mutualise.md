@@ -26,7 +26,7 @@ La cible de déploiement envisagée est un hébergement mutualisé. Sa capacité
 | # | Orientation | Statut |
 | --- | --- | --- |
 | D1 | Ajouter les applications frontend au monorepo lorsque le dépôt applicatif sera initialisé ; les CDC décrivent les exigences frontend et backend d'un même cœur. Ne pas créer un CDC autonome pour le frontend. | [DÉCISION] sur la méthode documentaire |
-| D2 | Séparer les surfaces selon leurs publics (espace client et back-office) en deux applications distinctes : `apps/customer-portal` (livrée en premier) et `apps/staff-portal` (à faire). | [DÉCISION] confirmée par le porteur le 23 novembre 2026 |
+| D2 | Séparer les surfaces selon leurs publics (espace client et back-office) en deux applications distinctes : `apps/customer-portal` (livrée en premier) et `apps/staff-portal`. | [DÉCISION] confirmée par le porteur le 23 novembre 2026 |
 | D3 | Partager les contrats HTTP (schémas de requête/réponse et types TypeScript) dans `@kgpay/contracts`, avec Yup pour les schémas validés et leurs types inférés (export `@kgpay/contracts/transport`). Les règles métier et la validation serveur restent sous l'autorité du backend ; le navigateur ne constitue jamais une frontière de sécurité. | [DÉCISION] confirmée par le porteur le 23 novembre 2026 |
 | D4 | Ne partager un composant visuel frontend qu'après avoir identifié un usage commun réel. Les packages partagés restent techniques ou de présentation, sans modèle de domaine ni décision métier. | [PROPOSITION] |
 | D5 | Privilégier des URLs sous un même domaine et un routage par chemin pour les services (ex. `/auth/*`, `/payments/*`) si l'hébergeur permet un reverse proxy ou mécanisme équivalent. Le routage reste une fonction d'infrastructure, pas une API Gateway applicative, conformément à ADR-001 D3. | [PROPOSITION] |
@@ -66,7 +66,7 @@ Cette arborescence illustre la proposition ; elle n'est pas créée ni figée pa
 kgpay/
 ├── apps/
 │   ├── customer-portal/       # espace client
-│   └── operations-console/    # interface du personnel
+│   └── staff-portal/          # interface du personnel
 ├── packages/
 │   ├── contracts/             # contrats HTTP/événements et schémas partagés
 │   └── ui/                    # composants visuels réellement communs, si nécessaire
@@ -156,4 +156,15 @@ Les chemins d'exemple ne constituent pas encore des routes HTTP contractuelles. 
 - **Client HTTP (D11) :** fabrique `createHttpClient` ; une instance `authApi` pour `auth-service`, `baseURL` issu de `VITE_AUTH_API_URL__CUSTOMER_PORTAL`. L'authentification est demandée explicitement par appel (`authentication: "access-token"`), jamais déduite de l'URL ; un seul rejeu après refresh sur 401. Aucune journalisation de payload ni de jeton.
 - **Session :** access token et état de session en mémoire uniquement. Le refresh passe par `GET /auth/csrf` (le cookie `kgpay_csrf` est limité au chemin `/auth`) puis `POST /auth/refresh`, sérialisé (single-flight + `navigator.locks`) car la rotation révoque la famille de sessions en cas de réutilisation.
 - **Variables d'environnement :** `VITE_AUTH_API_URL` (requise), `VITE_PASSWORD_MIN_LENGTH` et `VITE_OTP_RESEND_COOLDOWN_SECONDS` (optionnelles) sous le préfixe `__CUSTOMER_PORTAL`. Ces deux valeurs dupliquent la configuration backend (`PASSWORD_MIN_LENGTH`, `OTP_RESEND_COOLDOWN_SECONDS`) : le backend reste l'autorité.
-- **[POINT OUVERT]** `staff-portal`, origines/cookies/CSRF en production, absence de `GET /auth/me` (l'e-mail courant n'est pas affichable), compatibilité de l'hébergement mutualisé.
+- **[POINT OUVERT]** Origines/cookies/CSRF en production, absence de `GET /auth/me` (l'e-mail courant n'est pas affichable), compatibilité de l'hébergement mutualisé.
+
+## 12. Mise en œuvre — `staff-portal` (23 novembre 2026)
+
+> **Information de mise en œuvre, sans changement du statut global de cet ADR.** D2 et D3 restent [DÉCISION] ; les autres orientations demeurent [PROPOSITION] ou [POINT OUVERT].
+
+- **Application :** `apps/staff-portal` est un workspace React 19/Vite distinct, aligné sur l'espace client pour React Router, Zustand, react-i18next, Axios, Yup, Vitest/Testing Library, polices locales et identité visuelle KG Pay.
+- **Architecture UI :** `App.tsx` reste limité au bootstrap ; les routes, layouts/gardes, pages, composants UI, composantes d'administration, composables, traductions FR/EN et feuilles `tokens/base/components` suivent désormais l'organisation de `customer-portal`. Les parcours STAFF et les contrats d'API restent propres à cette application.
+- **Parcours :** connexion personnel avec OTP obligatoire, acceptation d'invitation, récupération/réinitialisation de mot de passe, gestion des identités/rôles, récupération d'e-mail STAFF avec step-up, journal/revue des accès et sessions propres accessibles à tout STAFF authentifié. L'interface masque les fonctions d'administration aux comptes sans `GLOBAL_SUPER_ADMIN` uniquement pour l'ergonomie ; `auth-service` conserve l'autorité d'accès.
+- **Transport :** les types et schémas de validation de l'administration sont ajoutés à `@kgpay/contracts/transport`. L'application utilise les routes existantes, les preuves step-up et les clients Axios authentifiés explicitement. L'access token reste en mémoire ; le refresh utilise le cookie sécurisé et les appels CSRF/refresh/logout.
+- **Configuration :** `VITE_AUTH_API_URL__STAFF_PORTAL` et l'origine locale `http://localhost:5174` sont ajoutées au modèle `.env.example`/CORS.
+- **Limites / points ouverts :** le catalogue d'autorisations publié ne permet aucune permission non-super-admin aux rôles personnalisés ; `GET /admin/identities` ne fournit pas `lockedUntil` ; aucune route ne liste les sessions d'une autre identité. Les gabarits HTML bilingues OTP/invitation sont une proposition ; la copie finale et la recette de livraison restent ouvertes (CDC-01 §10.16). Le lien d'invitation STAFF est optionnel via `STAFF_PORTAL_URL__AUTH_SERVICE`.

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { EMAIL_FROM_ADDRESS, EMAIL_TRANSPORT } from './email-otp.tokens';
+import { createInvitationEmailTemplate } from './email-templates';
 import type { EmailTransport } from './email-otp.types';
 
 @Injectable()
@@ -16,18 +17,24 @@ export class InvitationEmailService {
     token: string,
     expiresInHours: number,
     locale: 'en' | 'fr',
+    staffPortalUrl?: string,
   ): Promise<void> {
+    const invitationUrl = staffPortalUrl
+      ? new URL(
+          'accept-invitation',
+          `${staffPortalUrl.replace(/\/+$/, '')}/`,
+        ).toString()
+      : undefined;
+    const template = createInvitationEmailTemplate({
+      token,
+      expiresInHours,
+      locale,
+      invitationUrl,
+    });
     await this.transport.sendMail({
       from: this.from,
       to,
-      subject:
-        locale === 'fr'
-          ? 'Votre invitation KG Pay'
-          : 'Your KG Pay staff invitation',
-      text:
-        locale === 'fr'
-          ? `Utilisez ce jeton d'invitation à usage unique avec POST /auth/invitations/accept : ${token}. Il expire dans ${expiresInHours} heures. Si vous n'attendiez pas cette invitation, ignorez cet e-mail.`
-          : `Use this one-time invitation token with POST /auth/invitations/accept: ${token}. It expires in ${expiresInHours} hours. If you did not expect this invitation, ignore this email.`,
+      ...template,
     });
   }
 }
