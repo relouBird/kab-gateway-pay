@@ -26,8 +26,8 @@ La cible de déploiement envisagée est un hébergement mutualisé. Sa capacité
 | # | Orientation | Statut |
 | --- | --- | --- |
 | D1 | Ajouter les applications frontend au monorepo lorsque le dépôt applicatif sera initialisé ; les CDC décrivent les exigences frontend et backend d'un même cœur. Ne pas créer un CDC autonome pour le frontend. | [DÉCISION] sur la méthode documentaire |
-| D2 | Séparer les surfaces selon leurs publics (espace client et back-office), sans imposer dès maintenant s'il s'agit de deux applications déployables ou de deux zones d'une application. | [PROPOSITION] |
-| D3 | Partager les contrats HTTP (schémas de requête/réponse et types TypeScript) dans `@kgpay/contracts`. Yup est une option privilégiée pour les schémas validés et leurs types inférés. Les règles métier et la validation serveur restent sous l'autorité du backend ; le navigateur ne constitue jamais une frontière de sécurité. | [PROPOSITION] |
+| D2 | Séparer les surfaces selon leurs publics (espace client et back-office) en deux applications distinctes : `apps/customer-portal` (livrée en premier) et `apps/staff-portal` (à faire). | [DÉCISION] confirmée par le porteur le 23 novembre 2026 |
+| D3 | Partager les contrats HTTP (schémas de requête/réponse et types TypeScript) dans `@kgpay/contracts`, avec Yup pour les schémas validés et leurs types inférés (export `@kgpay/contracts/transport`). Les règles métier et la validation serveur restent sous l'autorité du backend ; le navigateur ne constitue jamais une frontière de sécurité. | [DÉCISION] confirmée par le porteur le 23 novembre 2026 |
 | D4 | Ne partager un composant visuel frontend qu'après avoir identifié un usage commun réel. Les packages partagés restent techniques ou de présentation, sans modèle de domaine ni décision métier. | [PROPOSITION] |
 | D5 | Privilégier des URLs sous un même domaine et un routage par chemin pour les services (ex. `/auth/*`, `/payments/*`) si l'hébergeur permet un reverse proxy ou mécanisme équivalent. Le routage reste une fonction d'infrastructure, pas une API Gateway applicative, conformément à ADR-001 D3. | [PROPOSITION] |
 | D6 | Réserver un domaine API distinct, par exemple `api.<domaine>`, à une éventuelle API publique destinée aux intégrateurs. Cette exposition est hors du premier incrément et nécessitera ses propres contrôles et contrats. | [PROPOSITION] |
@@ -121,10 +121,10 @@ Les chemins d'exemple ne constituent pas encore des routes HTTP contractuelles. 
 ## 8. Points à confirmer
 
 1. Offre mutualisée exacte et support du reverse proxy, des processus Node.js et des bases.
-2. Deux applications déployables ou deux zones d'une même application.
-3. Contrat et version de Yup dans `@kgpay/contracts`, et critères justifiant un package partagé de composants UI.
+2. ~~Deux applications déployables ou deux zones d'une même application.~~ Tranché : deux applications (D2).
+3. ~~Contrat et version de Yup dans `@kgpay/contracts`~~ (tranché, D3 ; Yup `^1.7.1`) ; critères justifiant un package partagé de composants UI restent à définir.
 4. Stratégie de session dans les navigateurs et origines exactes des interfaces et API.
-5. Langue initiale par défaut et manière de mémoriser le choix français/anglais.
+5. ~~Langue initiale par défaut et manière de mémoriser le choix français/anglais.~~ Tranché : langue du navigateur avec repli sur le français, choix mémorisé en `localStorage` (`kgpay.locale`).
 6. Devise par défaut, unités mineures et source de la liste des devises autorisées.
 7. Ressources auxquelles s'applique la fenêtre annulable de deux secondes ; exclusions nécessaires pour les actions financières, sensibles et de sécurité urgente.
 8. Périmètre exact réalisable dans le premier incrément d'une journée.
@@ -146,3 +146,14 @@ Les chemins d'exemple ne constituent pas encore des routes HTTP contractuelles. 
 - **Parcours d'authentification à respecter :** `CUSTOMER` et `STAFF` se connectent par e-mail et mot de passe, puis valident un OTP e-mail à chaque nouvelle connexion. Aucune session complète n'est disponible avant cette validation. Le CDC-01 précise le stockage navigateur du jeton d'accès et le cookie de refresh ; les appels CSRF/refresh/logout sont illustrés dans la collection.
 - **État de recette :** les parcours principaux CUSTOMER/STAFF, l'intégration SMTP réelle via Maildev, le lint, le typecheck, les tests unitaires et le build ont été validés. Cela ne vaut pas recette complète du CDC-01 ; ses critères et points ouverts restent la référence. Le détail de la recette est tracé dans le [journal CDC-01 du 22 novembre](../journal/2026-11-22/CDC-01-identite-acces.md).
 - **[POINT OUVERT — CDC-01 §10, point 16] Courriels backend :** les messages d'OTP et d'invitation sont actuellement envoyés en texte simple, sans gabarit visuel HTML. Leur conception et validation visuelles restent à faire en coordination avec l'implémentation frontend ; aucune identité visuelle ni format final n'est décidé ici.
+
+## 11. Mise en œuvre — `customer-portal` (23 novembre 2026)
+
+> **Information de mise en œuvre, sans changement du statut global de cet ADR.** Seules D2 et D3 sont passées en [DÉCISION] ; les autres orientations restent des [PROPOSITION].
+
+- **Application :** `apps/customer-portal` (React 19, Vite, React Router, Zustand, react-i18next, Axios, Vitest + Testing Library). Les dépendances sont déclarées dans son manifest ; les polices Inter, Inter Tight et IBM Plex Mono sont servies localement via Fontsource.
+- **Contrats partagés :** `@kgpay/contracts/transport` expose les schémas Yup (messages = clés i18n) et les types de transport. L'application le consomme par alias vers les sources (Vite et `paths` TypeScript), car le package compile en CommonJS. Aucune entité Prisma ni règle métier n'y figure.
+- **Client HTTP (D11) :** fabrique `createHttpClient` ; une instance `authApi` pour `auth-service`, `baseURL` issu de `VITE_AUTH_API_URL__CUSTOMER_PORTAL`. L'authentification est demandée explicitement par appel (`authentication: "access-token"`), jamais déduite de l'URL ; un seul rejeu après refresh sur 401. Aucune journalisation de payload ni de jeton.
+- **Session :** access token et état de session en mémoire uniquement. Le refresh passe par `GET /auth/csrf` (le cookie `kgpay_csrf` est limité au chemin `/auth`) puis `POST /auth/refresh`, sérialisé (single-flight + `navigator.locks`) car la rotation révoque la famille de sessions en cas de réutilisation.
+- **Variables d'environnement :** `VITE_AUTH_API_URL` (requise), `VITE_PASSWORD_MIN_LENGTH` et `VITE_OTP_RESEND_COOLDOWN_SECONDS` (optionnelles) sous le préfixe `__CUSTOMER_PORTAL`. Ces deux valeurs dupliquent la configuration backend (`PASSWORD_MIN_LENGTH`, `OTP_RESEND_COOLDOWN_SECONDS`) : le backend reste l'autorité.
+- **[POINT OUVERT]** `staff-portal`, origines/cookies/CSRF en production, absence de `GET /auth/me` (l'e-mail courant n'est pas affichable), compatibilité de l'hébergement mutualisé.

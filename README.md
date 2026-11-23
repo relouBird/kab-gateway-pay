@@ -1,6 +1,6 @@
 # KG Pay — Guide développeur
 
-> **État au 22 novembre 2026 :** le workspace pnpm/Turborepo et `auth-service` sont présents ; le frontend KG Pay n'est pas encore créé. Le remote `origin` pointe vers GitHub et `dev` suit `origin/dev`.
+> **État au 23 novembre 2026 :** le workspace pnpm/Turborepo, `auth-service` et l'espace client `apps/customer-portal` (CDC-01 côté frontend client) sont présents ; `staff-portal` reste à construire. Le remote `origin` pointe vers GitHub et `dev` suit `origin/dev`.
 
 ## Démarrage d'une nouvelle tâche
 
@@ -15,7 +15,8 @@ Le CDC d'un cœur couvre ses exigences frontend **et** backend. Ne pas créer un
 
 ## État de la base applicative
 
-- `services/auth-service` implémente les parcours backend du CDC-01 : OTP e-mail obligatoire, rôles, sessions, administration, audit, outbox, Swagger et persistance PostgreSQL/Prisma. Les parcours CUSTOMER et STAFF sont testés sur un schéma PostgreSQL temporaire isolé ; une recette complémentaire vérifie la livraison SMTP réelle via Maildev/MCP pour les OTP de contact, connexion, récupération et step-up, ainsi que l'invitation STAFF. Les autres exigences et scénarios de sécurité du CDC-01 restent à couvrir avant de déclarer la recette complète. Le frontend KG Pay reste à construire.
+- `services/auth-service` implémente les parcours backend du CDC-01 : OTP e-mail obligatoire, rôles, sessions, administration, audit, outbox, Swagger et persistance PostgreSQL/Prisma. Les parcours CUSTOMER et STAFF sont testés sur un schéma PostgreSQL temporaire isolé ; une recette complémentaire vérifie la livraison SMTP réelle via Maildev/MCP pour les OTP de contact, connexion, récupération et step-up, ainsi que l'invitation STAFF. Les autres exigences et scénarios de sécurité du CDC-01 restent à couvrir avant de déclarer la recette complète. Le frontend du personnel reste à construire.
+- `apps/customer-portal` est l'espace client du CDC-01 (React/Vite) : inscription, OTP e-mail, connexion, récupération/changement de mot de passe, changement d'e-mail/téléphone avec step-up, sessions. Il consomme `auth-service` et les schémas Yup de `@kgpay/contracts/transport`. Pour l'utiliser en développement, ajouter l'origine `http://localhost:5173` à `AUTH_CORS_ORIGINS__AUTH_SERVICE` et les clés `VITE_*__CUSTOMER_PORTAL` de `.env.example` au `.env` racine.
 - `nexus-gate-web` est un exemple séparé de frontend avec des pages d'authentification, Yup, Zustand et Axios. Il sert de référence de conventions, pas de backend, de contrat API ou de modèle d'identité à recopier.
 - Le CDC-01 exige un OTP par e-mail après le mot de passe, à chaque nouvelle connexion, pour `CUSTOMER` comme pour `STAFF`. La boîte e-mail devient un facteur de sécurité critique ; cette solution est moins indépendante qu'un authenticator.
 - Seul l'e-mail est un identifiant vérifié. Le téléphone est conservé comme moyen de contact non vérifié, sans login, OTP SMS ni récupération de compte.
@@ -54,6 +55,11 @@ pnpm test:e2e:auth-service
 pnpm test:e2e:auth-service:isolated
 pnpm test:e2e:auth-service:maildev
 pnpm build:auth-service
+pnpm dev:customer-portal
+pnpm build:customer-portal
+pnpm lint:customer-portal
+pnpm typecheck:customer-portal
+pnpm test:customer-portal
 pnpm start:auth-service
 pnpm auth:keygen
 pnpm db:auth-service:generate
@@ -88,7 +94,7 @@ La configuration locale a une seule source éditable à la racine (`.env`, ignor
 
 1. Initialiser Git, `main`/`dev`, le workspace pnpm/Turborepo et le hook local.
 2. Terminer l'implémentation et la recette du backend `auth-service` conformément au CDC-01, en gardant visibles ses points ouverts.
-3. Implémenter les interfaces client/personnel du CDC-01 dans le(s) frontend(s) à valider.
+3. Implémenter les interfaces client/personnel du CDC-01 dans le(s) frontend(s) : l'espace client est livré (`apps/customer-portal`), le back-office `apps/staff-portal` reste à faire.
 4. Construire les cœurs suivants après validation de leurs CDC ; ne pas assimiler l'identité authentifiée au statut du dossier client.
 5. Vérifier la compatibilité réelle de l'hébergement cible avant d'établir les instructions de déploiement.
 
