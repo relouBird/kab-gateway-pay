@@ -49,3 +49,33 @@ Terminé pour la décision D12 et son implémentation locale. Les origines de pr
 - Le backend et les deux portails ont été relancés ; `/health`, `/login` CUSTOMER et `/login` STAFF répondent HTTP 200. L'utilisateur doit se reconnecter ; les anciens cookies ne restaurent pas les nouvelles sessions.
 - Exécuter RC1-608 dans les deux sens, puis reprendre la recette à RC1-102.
 - Valider en production les origines, `SameSite`, `Secure`, CSRF/XSS et le routage d'hébergement.
+
+## Mise à jour — états réseau et OTP des portails (24 novembre 2026)
+
+### Objectif et statut
+
+Consigner l'implémentation des états de connectivité et de saisie OTP dans les applications CUSTOMER et STAFF. **Terminé** pour les interfaces ; aucun changement à D12 ni aux contrats d'API.
+
+### Résumé des changements
+
+- Les pages URL inconnue, hors ligne et réseau rétabli sont désormais distinctes dans chaque portail et partagent un layout de statut. Le rechargement après rétablissement est explicite et aucune requête n'est rejouée.
+- Les codes à six chiffres utilisent un composant OTP accessible à six cases avec collage, autofill, navigation clavier et erreurs associées.
+- Le CDC et la présente décision décrivent les comportements livrés.
+
+### Chemins modifiés
+
+- `apps/customer-portal/src/App.tsx`, `src/components/account/ChangeEmailCard.tsx`, `src/components/account/StepUpPanel.tsx`, `src/components/auth/OtpChallengeView.tsx`, `src/composables/useYupForm.ts`, `src/i18n/locales/en.ts`, `src/i18n/locales/fr.ts`, `src/pages/ConnectionPage.tsx` (supprimé), `src/pages/NotFoundPage.tsx`, `src/pages/ResetPasswordPage.tsx`, `src/styles/components.css` et nouveaux composants/tests sous `src/components/layout`, `src/components/ui` et `src/pages`.
+- `apps/staff-portal/src/App.tsx`, `src/composables/useYupForm.ts`, `src/features/admin/components/RecoveryDialog.tsx`, `src/features/admin/components/StepUpDialog.tsx`, `src/i18n/locales/en.ts`, `src/i18n/locales/fr.ts`, `src/pages/ConnectionPage.tsx` (supprimé), `src/pages/NotFoundPage.tsx`, `src/pages/auth/ForgotPasswordPage.tsx`, `src/pages/auth/ForgotPasswordPage.test.tsx`, `src/pages/auth/MfaPage.tsx`, `src/styles/components.css` et nouveaux composants/tests sous `src/components/layout`, `src/components/ui` et `src/pages`.
+- `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`, `docs/cdc/CDC-01-identite-acces.md`.
+
+### Validations
+
+- Tests CUSTOMER : 38 réussis ; STAFF : 13 réussis.
+- Typecheck et lint des deux portails : réussis.
+- Builds des deux portails : réussis ; avertissement Vite existant d'un chunk JS minifié supérieur à 500 kB.
+- Simulation navigateur `offline`/`online` vérifiée dans les deux applications. Aucun débordement horizontal constaté sur CUSTOMER aux largeurs 320, 360, 600, 840 et 1120 px, ni sur STAFF à 600 px.
+
+### Points ouverts et suite attendue
+
+- La longueur OTP frontend est six ; conserver `OTP_LENGTH=6` côté backend ou aligner les portails avant tout changement de configuration.
+- La recette utilisateur et les autres validations de production listées ci-dessus restent indépendantes de cette livraison.

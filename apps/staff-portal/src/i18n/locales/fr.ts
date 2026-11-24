@@ -10,6 +10,8 @@ export const fr = {
   password: "Mot de passe",
   newPassword: "Nouveau mot de passe",
   otp: "Code de sécurité",
+  otpHint: "Saisissez les 6 chiffres reçus par e-mail ou collez le code.",
+  otpDigitPosition: "{{label}} — chiffre {{current}} sur {{total}}",
   invitationToken: "Jeton d’invitation",
   signIn: "Continuer",
   verify: "Vérifier le code",
@@ -157,18 +159,15 @@ export const fr = {
       eyebrow: "Hors connexion",
       title: "Plus de réseau pour le moment.",
       message:
-        "Votre appareil n’est plus connecté à Internet. Dès que le réseau revient, vous pourrez reprendre.",
+        "Votre appareil n’est plus connecté à Internet. Rétablissez le réseau pour continuer.",
     },
     restored: {
       eyebrow: "Connexion rétablie",
       title: "De retour. Tout est en place.",
       message:
-        "Votre connexion fonctionne de nouveau. Rechargez la page pour continuer en toute sécurité.",
+        "La connexion est rétablie. Rechargez la page pour continuer ; aucune requête n’est relancée automatiquement.",
       action: "Recharger la page",
     },
-    paymentTitle: "Un paiement était en cours ?",
-    paymentNote:
-      "Il a peut-être abouti avant la coupure. Ne le relancez pas avant d’avoir consulté son suivi.",
     waiting: "En attente du réseau…",
   },
 };

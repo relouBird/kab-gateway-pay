@@ -45,7 +45,7 @@ export const en: Translation = {
     },
     otp: {
       required: "Enter the code you received by email.",
-      invalid: "The code must contain 6 to 10 digits.",
+      invalid: "The code must contain exactly 6 digits.",
     },
     password: {
       required: "Enter a password.",
@@ -80,7 +80,8 @@ export const en: Translation = {
   },
   otp: {
     code: "Verification code",
-    codeHint: "One-time code received by email.",
+    codeHint: "Enter the 6 digits sent by email, or paste the code.",
+    digitPosition: "{{label}} — digit {{current}} of {{total}}",
     resend: "Resend the code",
     resendIn_one: "Resend the code ({{count}} second)",
     resendIn_other: "Resend the code ({{count}} seconds)",
@@ -244,18 +245,15 @@ export const en: Translation = {
       eyebrow: "Offline",
       title: "No network for now.",
       message:
-        "Your device is no longer connected to the internet. You can continue when the connection returns.",
+        "Your device is no longer connected to the internet. Reconnect to continue.",
     },
     restored: {
       eyebrow: "Connection restored",
       title: "You’re back. Everything is in place.",
       message:
-        "Your connection is working again. Reload the page to continue safely.",
+        "Your connection is back. Reload the page to continue; no request is replayed automatically.",
       action: "Reload the page",
     },
-    paymentTitle: "Was a payment in progress?",
-    paymentNote:
-      "It may have completed before the connection dropped. Check its status before trying again.",
     waiting: "Waiting for a network…",
   },
 };

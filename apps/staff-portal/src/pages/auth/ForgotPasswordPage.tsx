@@ -9,6 +9,7 @@ import { Button } from "../../components/ui/Button";
 import { env } from "../../config/env";
 import { Notice } from "../../components/ui/Notice";
 import { PageTitle } from "../../components/ui/PageTitle";
+import { OtpInput } from "../../components/ui/OtpInput";
 import { TextField } from "../../components/ui/TextField";
 import { useYupForm } from "../../composables/useYupForm";
 import { authService } from "../../services/authService";
@@ -35,6 +36,7 @@ export function ForgotPasswordPage() {
     schema: resetPasswordSchema,
     initialValues: initialResetValues,
   });
+  const codeField = resetForm.field("code");
   const [challengeId, setChallengeId] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -119,11 +121,14 @@ export function ForgotPasswordPage() {
           onSubmit={(event) => void reset(event)}
           noValidate
         >
-          <TextField
-            {...resetForm.field("code")}
+          <OtpInput
+            id={codeField.id}
             label={t("otp")}
-            autoComplete="one-time-code"
-            inputMode="numeric"
+            value={codeField.value}
+            onChange={(value) => resetForm.setFieldValue("code", value)}
+            hint={t("otpHint")}
+            error={codeField.error}
+            disabled={pending}
           />
           <TextField
             {...resetForm.field("newPassword")}

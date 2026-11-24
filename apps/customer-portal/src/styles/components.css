@@ -178,6 +178,91 @@ html[data-theme="dark"] .btn--danger {
   margin-top: 2px;
 }
 
+.otp-field {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.otp-field__label {
+  font-weight: 600;
+}
+
+.otp-input {
+  --otp-separator-width: 12px;
+  display: grid;
+  width: min(100%, 360px);
+  align-items: center;
+  gap: 8px;
+}
+
+.otp-input__separator {
+  display: block;
+  width: 8px;
+  height: 2px;
+  justify-self: center;
+  border-radius: 2px;
+  background: var(--kg-border-strong);
+}
+
+.otp-input__cell {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  padding: 0;
+  border: 1.5px solid var(--kg-input-border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text);
+  font: 500 1.5rem/1 var(--font-mono);
+  text-align: center;
+  caret-color: var(--focus);
+  transition:
+    border-color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease),
+    background-color var(--t-fast) var(--ease);
+}
+
+.otp-input__cell[data-filled] {
+  border-color: var(--kg-green-900);
+  background: var(--surface);
+}
+
+html[data-theme="dark"] .otp-input__cell[data-filled] {
+  border-color: var(--kg-sand-yellow);
+}
+
+.otp-input__cell:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.otp-input__cell:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.otp-field--invalid .otp-input__cell {
+  border-color: var(--error-text);
+}
+
+.otp-field__hint,
+.otp-field__error {
+  font-size: 0.875rem;
+}
+
+.otp-field__hint {
+  color: var(--text-muted);
+}
+
+.otp-field__error {
+  color: var(--error-text);
+  font-weight: 500;
+}
+
 /* ---------- Cartes & titres ---------- */
 .card {
   background: var(--surface);
@@ -671,6 +756,7 @@ html[data-theme="dark"] .auth-shell__card {
 @media (forced-colors: active) {
   .btn,
   .field__input,
+  .otp-input__cell,
   .notice,
   .badge {
     border: 1px solid CanvasText;
@@ -766,6 +852,18 @@ html[data-theme="dark"] .auth-shell__card {
   }
 }
 
+@media (max-width: 360px) {
+  .otp-input {
+    --otp-separator-width: 8px;
+    gap: 4px;
+  }
+
+  .otp-input__cell {
+    min-height: 52px;
+    font-size: 1.25rem;
+  }
+}
+
 /* ---------- États de navigation et de connexion ---------- */
 .status-page {
   position: relative;
@@ -835,22 +933,7 @@ html[data-theme="dark"] .status-page__mark {
   color: var(--kg-sand-50);
 }
 
-.status-page__pulse {
-  position: absolute;
-  width: 18%;
-  aspect-ratio: 1;
-  border: 2px solid var(--kg-sand-yellow);
-  border-radius: 50%;
-  animation: status-pulse 1.6s var(--ease) infinite;
-}
 
-@keyframes status-pulse {
-  to {
-    box-shadow: 0 0 0 18px transparent;
-    opacity: 0;
-    transform: scale(1.35);
-  }
-}
 
 .status-page__message {
   max-width: 560px;
@@ -876,18 +959,6 @@ html[data-theme="dark"] .status-page__mark {
   color: var(--text-muted);
   font-size: 1.125rem;
   line-height: 1.6;
-}
-
-.status-page__note {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 36em;
-  margin-top: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--kg-border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
 }
 
 .status-page__waiting {
@@ -930,7 +1001,7 @@ html[data-theme="dark"] .status-page__mark {
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .status-page {
     padding-right: 16px;
     padding-left: 16px;

@@ -60,6 +60,13 @@ export function useYupForm<T extends Record<string, string>>({
     [errors, values, formId, t],
   );
 
+  const setFieldValue = useCallback((name: keyof T & string, value: string) => {
+    setValues((current) => ({ ...current, [name]: value }));
+    setErrors((current) =>
+      current[name] ? { ...current, [name]: undefined } : current,
+    );
+  }, []);
+
   const reset = useCallback(() => {
     setValues(initialValues);
     setErrors({});
@@ -72,5 +79,5 @@ export function useYupForm<T extends Record<string, string>>({
     );
   }, []);
 
-  return { values, field, validate, reset, clearField };
+  return { values, field, setFieldValue, validate, reset, clearField };
 }

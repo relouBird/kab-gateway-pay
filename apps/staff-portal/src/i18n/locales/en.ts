@@ -10,6 +10,8 @@ export const en = {
   password: "Password",
   newPassword: "New password",
   otp: "Security code",
+  otpHint: "Enter the 6 digits sent by email, or paste the code.",
+  otpDigitPosition: "{{label}} — digit {{current}} of {{total}}",
   invitationToken: "Invitation token",
   signIn: "Continue",
   verify: "Verify code",
@@ -157,18 +159,15 @@ export const en = {
       eyebrow: "Offline",
       title: "No network for now.",
       message:
-        "Your device is no longer connected to the internet. You can continue when the connection returns.",
+        "Your device is no longer connected to the internet. Reconnect to continue.",
     },
     restored: {
       eyebrow: "Connection restored",
       title: "You’re back. Everything is in place.",
       message:
-        "Your connection is working again. Reload the page to continue safely.",
+        "Your connection is back. Reload the page to continue; no request is replayed automatically.",
       action: "Reload the page",
     },
-    paymentTitle: "Was a payment in progress?",
-    paymentNote:
-      "It may have completed before the connection dropped. Check its status before trying again.",
     waiting: "Waiting for a network…",
   },
 };

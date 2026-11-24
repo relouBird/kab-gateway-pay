@@ -78,3 +78,42 @@ Diagnostic du verrou et correction de redirection terminés. La recette interact
 - **Pause de recette :** à la demande de l'utilisateur, arrêt après RC1-106 pour passer au CDC-02. La recette CDC-01 reste incomplète; le document contient 74 scénarios au total.
 - **Point de reprise CDC-01 :** RC1-108 (cas OTP faux/expiré/rejoué), si la recette est reprise ultérieurement.
 - **Observation OTP :** l'utilisateur a attendu 5 minutes avant de saisir le code et l'a trouvé expiré; le code renvoyé a également expiré après une nouvelle attente de 5 minutes. Ces refus sont conformes à la durée configurée. Après rechargement, la page revient à `/register`; une nouvelle soumission pour l'identité encore `PENDING_VERIFICATION` émet un nouveau défi/e-mail plutôt que de créer un second compte.
+
+## Mise à jour — pages d'état et saisie OTP (24 novembre 2026)
+
+### Objectif et statut
+
+Séparer les états introuvable, hors ligne et réseau rétabli dans les deux portails, et remplacer les champs OTP peu lisibles par une saisie à six cases réutilisable. **Terminé** ; aucune modification des contrats backend ou de gestion de session.
+
+### Résumé des changements
+
+- Pages 404, hors ligne et connexion rétablie distinctes, partageant un layout. Le retour réseau propose un rechargement explicite ; aucune requête n'est rejouée. Le texte hors ligne n'implique pas qu'un paiement était en cours.
+- Saisie OTP accessible à six cases dans les deux portails, utilisée dans les parcours de vérification, connexion MFA, récupération, changement d'adresse et step-up. Collage, auto-remplissage, navigation clavier, gestion d'erreur et tests ciblés ; le jeton d'invitation reste un champ texte.
+- Mise à jour des traductions et des descriptions du CDC/ADR.
+
+### Chemins modifiés
+
+- `apps/customer-portal/src/App.tsx`, `src/components/account/ChangeEmailCard.tsx`, `src/components/account/StepUpPanel.tsx`, `src/components/auth/OtpChallengeView.tsx`, `src/composables/useYupForm.ts`, `src/i18n/locales/en.ts`, `src/i18n/locales/fr.ts`, `src/pages/ConnectionPage.tsx` (supprimé), `src/pages/NotFoundPage.tsx`, `src/pages/ResetPasswordPage.tsx`, `src/styles/components.css`.
+- Nouveaux fichiers client : `apps/customer-portal/src/components/layout/StatusPageLayout.tsx`, `src/components/ui/OtpInput.tsx`, `src/components/ui/OtpInput.test.tsx`, `src/components/ui/StatusRosette.tsx`, `src/pages/ConnectionRestoredPage.tsx`, `src/pages/NotFoundPage.test.tsx`, `src/pages/OfflinePage.tsx`.
+- `apps/staff-portal/src/App.tsx`, `src/composables/useYupForm.ts`, `src/features/admin/components/RecoveryDialog.tsx`, `src/features/admin/components/StepUpDialog.tsx`, `src/i18n/locales/en.ts`, `src/i18n/locales/fr.ts`, `src/pages/ConnectionPage.tsx` (supprimé), `src/pages/NotFoundPage.tsx`, `src/pages/auth/ForgotPasswordPage.tsx`, `src/pages/auth/ForgotPasswordPage.test.tsx`, `src/pages/auth/MfaPage.tsx`, `src/styles/components.css`.
+- Nouveaux fichiers staff : `apps/staff-portal/src/components/layout/StatusPageLayout.tsx`, `src/components/ui/OtpInput.tsx`, `src/components/ui/OtpInput.test.tsx`, `src/components/ui/StatusRosette.tsx`, `src/pages/ConnectionRestoredPage.tsx`, `src/pages/NotFoundPage.test.tsx`, `src/pages/OfflinePage.tsx`.
+- `docs/cdc/CDC-01-identite-acces.md`, `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`.
+
+### Exigences concernées
+
+- IAM-F-26 et CDC-01 §8.11 : états web de navigation et de connectivité.
+- Parcours OTP du CDC-01 : vérification d'adresse, MFA, récupération, changement d'adresse et step-up.
+
+### Validations
+
+- `pnpm test:customer-portal` : 38 tests réussis (13 fichiers).
+- `pnpm test:staff-portal` : 13 tests réussis (8 fichiers).
+- `pnpm typecheck:customer-portal`, `pnpm typecheck:staff-portal` : réussis.
+- `pnpm lint:customer-portal`, `pnpm lint:staff-portal` : réussis, zéro avertissement/erreur.
+- `pnpm build:customer-portal`, `pnpm build:staff-portal` : réussis ; Vite signale toujours un chunk JS minifié supérieur à 500 kB.
+- Vérification navigateur par simulation des événements `offline`/`online` sur les deux portails : les vues hors ligne puis rétablie sont distinctes ; aucun texte paiement dans l'écran hors ligne client. Aucun débordement horizontal constaté sur le portail client aux largeurs 320, 360, 600, 840 et 1120 px, ni sur le portail staff à 600 px.
+
+### Points ouverts et suite attendue
+
+- La saisie frontend est fixée à six chiffres tandis que le backend permet `OTP_LENGTH` de 1 à 10 (défaut 6). Garder la configuration à six, ou aligner les deux portails avant de modifier cette valeur.
+- La recette manuelle CDC-01 reste à poursuivre à RC1-108 ; l'implémentation des pages ne vaut pas validation utilisateur ni recette complète.

@@ -407,6 +407,7 @@ Journaux structurés (JSON) avec `correlationId`. Métriques minimales : connexi
 - **Recette staff :** lint, typecheck, tests ciblés et build du workspace passent. Le parcours navigateur authentifié contre `auth-service`/PostgreSQL/Maildev n'a pas été exécuté.
 - **[POINT OUVERT — §10, point 16] Courriels :** les gabarits HTML et la copie bilingue ne sont pas encore conçus ; l'URL de destination pour l'invitation doit être validée avant d'ajouter un lien dans le courriel.
 - **Écarts/limites connus :** pas de `GET /auth/me` (l'e-mail courant n'est pas affiché) ; le changement de mot de passe révoque toutes les sessions, le portail renvoie donc vers la connexion ; les messages serveur ne sont pas affichés, les erreurs sont traduites côté front selon statut et contexte ; la récupération d'un CUSTOMER ayant perdu l'accès à son e-mail reste du ressort du support (point ouvert).
+- **Saisie OTP (24 novembre 2026) :** les deux portails utilisent une saisie visuelle en six cases pour les codes à six chiffres, avec collage du code complet, remplissage automatique navigateur, navigation clavier et états d'erreur. Elle est réutilisée pour la vérification d'adresse, la connexion MFA, la récupération de mot de passe, les changements d'adresse et les confirmations step-up ; le jeton d'invitation reste une saisie texte distincte. Le backend garde `OTP_LENGTH` configurable (défaut 6, plage 1–10) : toute configuration différente de six exige d'aligner les portails avant activation.
 - **IAM-F-26 — implémentation (23 novembre 2026) :** les layouts d'authentification
   proposent A sombre/B clair ; l'espace connecté reprend le shell responsive de la
   référence (navigation latérale sur grand écran, navigation basse sur mobile,
@@ -420,6 +421,7 @@ Journaux structurés (JSON) avec `correlationId`. Métriques minimales : connexi
   nécessaires à son shell hors ligne. Les données d'identité/financières et les
   réponses API ne sont pas mises en cache ; les opérations ne sont ni mises en
   file ni rejouées.
+- **IAM-F-26 — séparation des vues (24 novembre 2026) :** chaque portail a une page dédiée à une URL introuvable, une page hors ligne et une page de rétablissement du réseau. Le rétablissement propose un rechargement explicite ; aucune requête n'est rejouée automatiquement. L'écran hors ligne reste générique et ne suppose pas qu'une opération financière était en cours.
 
 ## 9. Cas limites et exceptions
 

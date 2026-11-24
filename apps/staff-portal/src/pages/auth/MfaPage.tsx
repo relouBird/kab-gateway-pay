@@ -5,7 +5,7 @@ import { otpFormSchema } from "@kgpay/contracts/transport";
 import { Button } from "../../components/ui/Button";
 import { env } from "../../config/env";
 import { PageTitle } from "../../components/ui/PageTitle";
-import { TextField } from "../../components/ui/TextField";
+import { OtpInput } from "../../components/ui/OtpInput";
 import { useYupForm } from "../../composables/useYupForm";
 import { authService } from "../../services/authService";
 import { signOut } from "../../services/sessionManager";
@@ -29,6 +29,7 @@ export function MfaPage() {
     schema: otpFormSchema,
     initialValues: initialOtpValues,
   });
+  const codeField = form.field("code");
   const [resendRemaining, setResendRemaining] = useState(
     env.otpResendCooldownSeconds,
   );
@@ -115,13 +116,14 @@ export function MfaPage() {
         onSubmit={(event) => void submit(event)}
         noValidate
       >
-        <TextField
-          {...form.field("code")}
+        <OtpInput
+          id={codeField.id}
           label={t("otp")}
-          autoComplete="one-time-code"
-          inputMode="numeric"
-          maxLength={10}
-          pattern="[0-9]{6,10}"
+          value={codeField.value}
+          onChange={(value) => form.setFieldValue("code", value)}
+          hint={t("otpHint")}
+          error={codeField.error}
+          disabled={pending}
         />
         <Button
           type="submit"

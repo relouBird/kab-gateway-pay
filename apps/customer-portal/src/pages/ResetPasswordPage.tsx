@@ -5,6 +5,7 @@ import { createResetPasswordSchema } from "@kgpay/contracts/transport";
 import { OtpResend } from "../components/auth/OtpResend";
 import { Button } from "../components/ui/Button";
 import { Notice } from "../components/ui/Notice";
+import { OtpInput } from "../components/ui/OtpInput";
 import { PageTitle } from "../components/ui/PageTitle";
 import { TextField } from "../components/ui/TextField";
 import { env } from "../config/env";
@@ -27,6 +28,7 @@ export function ResetPasswordPage() {
     [],
   );
   const form = useYupForm({ formId: "reset", schema, initialValues });
+  const codeField = form.field("code");
   const { pending, error, run } = useSubmit("reset");
 
   if (!flow)
@@ -65,14 +67,14 @@ export function ResetPasswordPage() {
             {t(error.key)}
           </Notice>
         ) : null}
-        <TextField
-          {...form.field("code")}
+        <OtpInput
+          id={codeField.id}
           label={t("otp.code")}
+          value={codeField.value}
+          onChange={(value) => form.setFieldValue("code", value)}
           hint={t("otp.codeHint")}
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          spellCheck={false}
-          className="field--code"
+          error={codeField.error}
+          disabled={pending}
         />
         <TextField
           {...form.field("newPassword")}

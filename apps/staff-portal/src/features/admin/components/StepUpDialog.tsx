@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorNotice } from "../../../components/ui/ErrorNotice";
+import { OtpInput } from "../../../components/ui/OtpInput";
 
 export function StepUpDialog({
   pending,
@@ -42,25 +43,22 @@ export function StepUpDialog({
           className="stack"
           onSubmit={(event) => {
             event.preventDefault();
+            if (code.length !== 6) return;
             onConfirm(code);
           }}
         >
-          <label className="field">
-            <span>{t("otp")}</span>
-            <input
-              autoComplete="one-time-code"
-              inputMode="numeric"
-              maxLength={10}
-              onChange={(e) => setCode(e.target.value)}
-              pattern="[0-9]{6,10}"
-              required
-              value={code}
-            />
-          </label>
+          <OtpInput
+            id="step-up-code"
+            label={t("otp")}
+            value={code}
+            onChange={setCode}
+            hint={t("otpHint")}
+            disabled={pending}
+          />
           <div className="actions">
             <button
               className="button button--primary"
-              disabled={pending}
+              disabled={pending || code.length !== 6}
               type="submit"
             >
               {pending ? t("loading") : t("confirm")}
