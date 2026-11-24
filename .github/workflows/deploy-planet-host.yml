@@ -1,0 +1,500 @@
+name: Build and deploy KG Pay to PlanetHoster
+
+# Workflow interne partagé par le premier déploiement et les déploiements normaux.
+# Il construit les artefacts sur GitHub, les transfère vers PH, publie la release,
+# puis remplace et redémarre uniquement le runtime d'auth-service.
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: initialize or deploy
+        required: true
+        type: string
+
+permissions:
+  # Le runner lit le dépôt; la connexion au serveur passe par les secrets SSH.
+  contents: read
+
+concurrency:
+  # Empêche deux publications simultanées sur la même installation de production.
+  group: kgpay-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy main
+    runs-on: ubuntu-latest
+    # Les secrets applicatifs viennent de production; les paramètres distants SERVER_* restent séparés.
+    environment: production
+
+    steps:
+      - name: Validate production inputs
+        env:
+          DEPLOY_MODE: ${{ inputs.mode }}
+          KG_PAY_APP_ENV: ${{ secrets.KG_PAY_APP_ENV }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Le fichier applicatif complet est un secret GitHub Environment, distinct des secrets SERVER_*.
+          if [[ "$GITHUB_REF_NAME" != "main" ]]; then
+            echo "Production deployment is allowed only from main."
+            exit 1
+          fi
+          if [[ "$DEPLOY_MODE" != "initialize" && "$DEPLOY_MODE" != "deploy" ]]; then
+            echo "Unknown deployment mode: $DEPLOY_MODE"
+            exit 1
+          fi
+          test -n "$KG_PAY_APP_ENV" || {
+            echo "KG_PAY_APP_ENV is required in the production environment."
+            exit 1
+          }
+
+      # La construction et la préparation des dépendances ont lieu sur le runner GitHub.
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Vérifie les outils/scripts opérateur concernés avant de produire ou publier une release.
+      - name: Run focused deployment tests
+        run: |
+          node --test \
+            scripts/generate-env.test.cjs \
+            scripts/run-prisma.test.cjs \
+            scripts/bump-version.test.cjs \
+            deploy-tools/release-manager.test.cjs
+
+      - name: Build all workspaces
+        env:
+          # Secret unique contenant le contenu complet de .env.prod; ne jamais l'afficher.
+          KG_PAY_APP_ENV: ${{ secrets.KG_PAY_APP_ENV }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Reconstruit le .env de l'application sur le runner, avec des droits privés.
+          # Le secret contient la configuration applicative seulement; les accès PH sont SERVER_* séparés.
+          umask 077
+          trap 'rm -f .env; rm -rf .generated/env' EXIT
+          test -n "$KG_PAY_APP_ENV"
+          printf '%s' "$KG_PAY_APP_ENV" > .env
+          unset KG_PAY_APP_ENV
+          # La génération build filtre les variables runtimeOnly; rien n'est transféré dans l'archive.
+          pnpm run build
+
+      # Regroupe les sorties statiques et le runtime autonome; aucun .env n'entre dans l'archive.
+      - name: Package static builds and auth-service runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Les portails restent des fichiers statiques; seul auth-service embarque node_modules.
+          release_dir="$RUNNER_TEMP/kgpay-release"
+          archive="$RUNNER_TEMP/kgpay-build.tar.gz"
+          mkdir -p "$release_dir"
+
+          for workspace_root in apps packages; do
+            while IFS= read -r -d '' dist_dir; do
+              relative_parent="$(dirname "$dist_dir")"
+              mkdir -p "$release_dir/$relative_parent"
+              cp -a "$dist_dir" "$release_dir/$relative_parent/"
+            done < <(
+              find "$workspace_root" \
+                -type d -name node_modules -prune -o \
+                -type d -name dist -prune -print0
+            )
+          done
+
+          pnpm --filter auth-service deploy --prod --legacy \
+            "$release_dir/services/auth-service"
+
+          (
+            cd "$release_dir/services/auth-service"
+            test ! -e .env
+            # Prisma ne fait que générer le client ici; cette URL synthétique ne contacte aucune base.
+            DATABASE_URL="postgresql://build:synthetic@127.0.0.1:5432/kgpay" \
+              npm exec --yes --package=prisma@6.19.3 -- \
+              prisma generate --schema=prisma/schema.prisma
+            node -e "
+              require('@kgpay/contracts');
+              require('@nestjs/core');
+              const { PrismaClient } = require('@prisma/client');
+              if (typeof PrismaClient !== 'function') process.exit(1);
+            "
+          )
+
+          test -f "$release_dir/apps/customer-portal/dist/index.html"
+          test -f "$release_dir/apps/staff-portal/dist/index.html"
+          test -f "$release_dir/packages/contracts/dist/index.js"
+          test -f "$release_dir/services/auth-service/dist/main.js"
+          test -f "$release_dir/services/auth-service/prisma/schema.prisma"
+          test -f "$release_dir/services/auth-service/prisma/migrations/migration_lock.toml"
+          test -f "$release_dir/services/auth-service/node_modules/@nestjs/core/package.json"
+          test -f "$release_dir/services/auth-service/node_modules/@kgpay/contracts/package.json"
+          find "$release_dir/services/auth-service/prisma/migrations" \
+            -mindepth 2 -name migration.sql -print -quit | grep -q .
+          if find "$release_dir" -type f \
+            \( -name .env -o -name '.env.*' \) -print -quit | grep -q .; then
+            echo "A .env file must never be included in the release."
+            exit 1
+          fi
+
+          # Le manifeste permet au serveur de vérifier l'identité exacte de l'archive publiée.
+          node - "$release_dir" <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const releaseDir = process.argv[2];
+          const manifest = {
+            commit: process.env.GITHUB_SHA,
+            ref: process.env.GITHUB_REF_NAME,
+            version: require('./package.json').version,
+          };
+          fs.writeFileSync(
+            path.join(releaseDir, 'manifest.json'),
+            `${JSON.stringify(manifest, null, 2)}\n`,
+          );
+          NODE
+
+          tar -C "$release_dir" -czf "$archive" .
+
+      # L'archive est gardée comme artefact GitHub et peut être consultée pendant 30 jours.
+      - name: Save GitHub artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kgpay-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/kgpay-build.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+
+      # Prépare la clé privée SSH. La vérification de la clé d'hôte est désactivée plus bas.
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SERVER_SSH_KEY"
+          printf '%s\n' "$SERVER_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          chmod 600 "$RUNNER_TEMP/deploy_key"
+
+      # Valide les chemins, transfère l'archive, puis exécute les opérations sur PH par SSH.
+      - name: Deploy dated release on PlanetHoster
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_PORT: ${{ vars.SERVER_SSH_PORT || '5022' }}
+          SERVER_DEPLOY_ROOT: ${{ vars.SERVER_DEPLOY_ROOT }}
+          SERVER_NODE_ENV_ACTIVATE: ${{ vars.SERVER_NODE_ENV_ACTIVATE }}
+          SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE: ${{ vars.SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE }}
+          SERVER_AUTH_SERVICE_APP_ROOT: ${{ vars.SERVER_AUTH_SERVICE_APP_ROOT }}
+          REPOSITORY: ${{ github.repository }}
+          DEPLOY_MODE: ${{ inputs.mode }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SERVER_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "$SERVER_USER" =~ ^[A-Za-z0-9._-]+$ ]]
+          [[ "$SERVER_SSH_PORT" =~ ^[0-9]+$ ]]
+          test "$SERVER_SSH_PORT" -ge 1
+          test "$SERVER_SSH_PORT" -le 65535
+
+          for path_value in \
+            "$SERVER_DEPLOY_ROOT" \
+            "$SERVER_NODE_ENV_ACTIVATE" \
+            "$SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE" \
+            "$SERVER_AUTH_SERVICE_APP_ROOT"; do
+            [[ "$path_value" =~ ^/[A-Za-z0-9._/-]+$ ]]
+            [[ "$path_value" != *".."* ]]
+          done
+          [[ "$SERVER_DEPLOY_ROOT" != "/" ]]
+          [[ "$SERVER_AUTH_SERVICE_APP_ROOT" != "/" ]]
+          [[ "$SERVER_NODE_ENV_ACTIVATE" != "$SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE" ]]
+          case "$SERVER_AUTH_SERVICE_APP_ROOT/" in
+            "$SERVER_DEPLOY_ROOT/"*)
+              echo "SERVER_AUTH_SERVICE_APP_ROOT must be separate from SERVER_DEPLOY_ROOT."
+              exit 1
+              ;;
+          esac
+          case "$SERVER_DEPLOY_ROOT/" in
+            "$SERVER_AUTH_SERVICE_APP_ROOT/"*)
+              echo "SERVER_DEPLOY_ROOT must be separate from SERVER_AUTH_SERVICE_APP_ROOT."
+              exit 1
+              ;;
+          esac
+          [[ "$REPOSITORY" == "relouBird/kab-gateway-pay" ]]
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+          # Rien n'est installé ou compilé sur PH: le serveur reçoit l'archive déjà construite.
+          archive="$RUNNER_TEMP/kgpay-build.tar.gz"
+          manager="$GITHUB_WORKSPACE/deploy-tools/release-manager.cjs"
+          test -f "$archive"
+          test -f "$manager"
+          remote="$SERVER_USER@$SERVER_HOST"
+          archive_name="kgpay-build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
+          manager_name="release-manager-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.cjs"
+
+          printf -v prepare_command 'bash -s -- %q' "$SERVER_DEPLOY_ROOT"
+          ssh -i "$RUNNER_TEMP/deploy_key" \
+            -p "$SERVER_SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$remote" "$prepare_command" <<'REMOTE'
+          set -eu
+          root="$1"
+            # Les uploads sont privés et temporaires; le release manager les nettoie après publication.
+          mkdir -p "$root/incoming"
+          REMOTE
+
+          scp -i "$RUNNER_TEMP/deploy_key" \
+            -P "$SERVER_SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$archive" "$remote:$SERVER_DEPLOY_ROOT/incoming/$archive_name"
+          scp -i "$RUNNER_TEMP/deploy_key" \
+            -P "$SERVER_SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$manager" "$remote:$SERVER_DEPLOY_ROOT/incoming/$manager_name"
+
+          printf -v deploy_command 'bash -s -- %q %q %q %q %q %q %q %q %q' \
+            "$SERVER_DEPLOY_ROOT" \
+            "$SERVER_NODE_ENV_ACTIVATE" \
+            "$SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE" \
+            "$SERVER_AUTH_SERVICE_APP_ROOT" \
+            "$GITHUB_SHA" \
+            "$archive_name" \
+            "$manager_name" \
+            "$REPOSITORY" \
+            "$DEPLOY_MODE"
+          ssh -i "$RUNNER_TEMP/deploy_key" \
+            -p "$SERVER_SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$remote" "$deploy_command" <<'REMOTE'
+          set -e
+          root="$1"
+          deploy_node_env="$2"
+          auth_node_env="$3"
+          auth_app_root="$4"
+          expected_commit="$5"
+          archive_name="$6"
+          manager_name="$7"
+          repository="$8"
+          mode="$9"
+          repository_dir="$root/repository"
+          archive="$root/incoming/$archive_name"
+          manager="$root/incoming/$manager_name"
+
+          # Vérifie les environnements Node des utilitaires et du service avant toute modification.
+          test -f "$deploy_node_env"
+          test -f "$auth_node_env"
+          test -d "$auth_app_root"
+          # Le .env source est déposé manuellement sur PH et reste hors des releases.
+          source_env_file="$auth_app_root/.env"
+          runtime_env_file="$auth_app_root/.generated/env/auth-service.runtime.env"
+          runtime_env_stage="$auth_app_root/.generated/env-stage-$archive_name"
+          if [ ! -f "$source_env_file" ]; then
+            echo "ERROR: Upload the production application .env to the private auth-service app root."
+            exit 1
+          fi
+          if [ -e "$runtime_env_stage" ]; then
+            echo "ERROR: An earlier runtime environment generation is incomplete."
+            exit 1
+          fi
+          test -f "$archive"
+          test -f "$manager"
+          case "$auth_app_root/" in
+            "$root/"*)
+              echo "ERROR: The auth-service app root must be separate from the release root."
+              exit 1
+              ;;
+          esac
+          case "$root/" in
+            "$auth_app_root/"*)
+              echo "ERROR: The release root must be separate from the auth-service app root."
+              exit 1
+              ;;
+          esac
+          command -v cp >/dev/null 2>&1 || {
+            echo "ERROR: cp is required on the server."
+            exit 1
+          }
+
+          if [ "$mode" = "initialize" ]; then
+            # Le clone distant vérifie la révision main; le build vient de l'archive GitHub.
+            # L'initialisation refuse d'écraser un déploiement ou un runtime préexistant.
+            if [ -e "$repository_dir" ] || [ -e "$root/dist" ] || [ -e "$root/local-builds" ]; then
+              echo "ERROR: Deployment paths already exist; initialization is only for a new target."
+              exit 1
+            fi
+            if [ -e "$auth_app_root/runtime" ]; then
+              echo "ERROR: auth-service runtime already exists; initialization is only for a new target."
+              exit 1
+            fi
+            clone_tmp="$root/.repository-init-$archive_name"
+            if [ -e "$clone_tmp" ]; then
+              echo "ERROR: A previous repository initialization is incomplete: $clone_tmp"
+              exit 1
+            fi
+            trap 'rm -rf -- "$clone_tmp"' EXIT
+            git clone --depth=1 --branch main \
+              "https://github.com/$repository.git" "$clone_tmp"
+            cloned_commit="$(git -C "$clone_tmp" rev-parse origin/main)"
+            if [ "$cloned_commit" != "$expected_commit" ]; then
+              echo "ERROR: GitHub main advanced before the first deployment; rerun the workflow."
+              exit 1
+            fi
+            git -C "$clone_tmp" reset --hard "$expected_commit"
+            mv "$clone_tmp" "$repository_dir"
+            trap - EXIT
+          elif [ "$mode" = "deploy" ]; then
+            # Les redéploiements exigent un clone initialisé et une archive toujours égale à main.
+            if [ ! -d "$repository_dir/.git" ]; then
+              echo "ERROR: Repository is not initialized. Run the first-deployment workflow first."
+              exit 1
+            fi
+            git -C "$repository_dir" fetch --prune origin main
+            remote_commit="$(git -C "$repository_dir" rev-parse origin/main)"
+            if [ "$remote_commit" != "$expected_commit" ]; then
+              echo "ERROR: GitHub main advanced before deployment; rerun the workflow for the latest commit."
+              exit 1
+            fi
+            git -C "$repository_dir" reset --hard "$expected_commit"
+          else
+            echo "ERROR: Unknown deployment mode."
+            exit 1
+          fi
+
+          trap 'rm -rf -- "$runtime_env_stage"' EXIT
+          # Transforme les clés suffixées du .env source en variables runtime non suffixées.
+          # La source explicite est prioritaire; les valeurs du shell ne remplacent pas la configuration PH.
+          (
+            source "$deploy_node_env"
+            set -u
+            node "$repository_dir/scripts/generate-env.cjs" \
+              --target auth-service \
+              --mode runtime \
+              --source-file "$source_env_file" \
+              --output-dir "$runtime_env_stage"
+          )
+          staged_runtime_env="$runtime_env_stage/auth-service.runtime.env"
+          test -f "$staged_runtime_env"
+          grep -Eq '^NODE_ENV=production\r?$' "$staged_runtime_env" || {
+            echo "ERROR: The private auth-service .env must configure production mode."
+            exit 1
+          }
+
+          (
+            source "$deploy_node_env"
+            set -u
+            node --version
+            # Valide l'archive, conserve cinq releases datées et met à jour la copie dist/.
+            node "$manager" \
+              --archive "$archive" \
+              --deploy-root "$root" \
+              --commit "$expected_commit"
+          )
+
+          runtime_source="$root/dist/services/auth-service"
+          runtime_dir="$auth_app_root/runtime"
+          runtime_stage="$auth_app_root/.runtime-next-$archive_name"
+          runtime_previous="$auth_app_root/.runtime-previous-$archive_name"
+          runtime_env_next="$runtime_env_file.next-$archive_name"
+          runtime_previous_moved=0
+          # Si l'activation échoue, restaure l'ancien runtime au lieu de laisser l'application absente.
+          cleanup_runtime() {
+            if [ -d "$runtime_env_stage" ]; then
+              rm -rf -- "$runtime_env_stage"
+            fi
+            if [ -e "$runtime_env_next" ]; then
+              rm -f -- "$runtime_env_next"
+            fi
+            if [ -d "$runtime_stage" ]; then
+              rm -rf -- "$runtime_stage"
+            fi
+            if [ "$runtime_previous_moved" -eq 1 ] &&
+              [ ! -e "$runtime_dir" ] &&
+              [ -e "$runtime_previous" ]; then
+              mv "$runtime_previous" "$runtime_dir"
+            fi
+          }
+          trap cleanup_runtime EXIT
+
+          # Ne remplace que runtime/; .generated/env et les clés privées restent hors du paquet.
+          test -d "$runtime_source"
+          if [ -e "$runtime_dir" ] && [ ! -d "$runtime_dir" ]; then
+            echo "ERROR: auth-service runtime path exists but is not a directory."
+            exit 1
+          fi
+          if [ "$mode" = "deploy" ] && [ ! -d "$runtime_dir" ]; then
+            echo "ERROR: auth-service runtime is not initialized."
+            exit 1
+          fi
+          if [ -d "$runtime_dir" ]; then
+            for env_file in "$runtime_dir"/.env "$runtime_dir"/.env.*; do
+              if [ -e "$env_file" ]; then
+                echo "ERROR: Move private runtime configuration outside auth-service/runtime."
+                exit 1
+              fi
+            done
+          fi
+          if [ -e "$runtime_stage" ] || [ -e "$runtime_previous" ]; then
+            echo "ERROR: An earlier runtime promotion is incomplete."
+            exit 1
+          fi
+
+          mkdir "$runtime_stage"
+          cp -a "$runtime_source/." "$runtime_stage/"
+          if [ -e "$runtime_dir" ]; then
+            mv "$runtime_dir" "$runtime_previous"
+            runtime_previous_moved=1
+          fi
+          if ! mv "$runtime_stage" "$runtime_dir"; then
+            echo "ERROR: Could not activate the new auth-service runtime."
+            exit 1
+          fi
+          if [ "$runtime_previous_moved" -eq 1 ]; then
+            rm -rf -- "$runtime_previous"
+            runtime_previous_moved=0
+          fi
+
+          # Publie atomiquement la configuration générée; le .env source et les clés restent intacts.
+          mkdir -p "$(dirname "$runtime_env_file")"
+          if [ -e "$runtime_env_next" ]; then
+            echo "ERROR: An earlier runtime environment promotion is incomplete."
+            exit 1
+          fi
+          mv "$staged_runtime_env" "$runtime_env_next"
+          mv "$runtime_env_next" "$runtime_env_file"
+          rmdir "$runtime_env_stage"
+          trap - EXIT
+
+          (
+            source "$auth_node_env"
+            set -u
+            node --version
+            # Le Node environment sert au redémarrage; les variables métier viennent du fichier runtime.
+            # Les migrations Prisma restent une opération manuelle distincte.
+            /usr/sbin/cloudlinux-selector restart \
+              --json \
+              --interpreter=nodejs \
+              --app-root="$auth_app_root"
+          )
+
+          rm -f -- "$archive" "$manager"
+          echo "Deployment successful: $expected_commit"
+          REMOTE

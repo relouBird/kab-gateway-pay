@@ -1,9 +1,9 @@
-'use strict';
+"use strict";
 
-const fs = require('node:fs');
-const path = require('node:path');
+const fs = require("node:fs");
+const path = require("node:path");
 
-const workspaceRoots = ['apps', 'packages', 'services'];
+const workspaceRoots = ["apps", "packages", "services"];
 const keyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function fail(message) {
@@ -12,13 +12,15 @@ function fail(message) {
 
 function parseEnvContent(contents, label) {
   const values = new Map();
-  const lines = contents.replace(/^\uFEFF/, '').split(/\r?\n/);
+  const lines = contents.replace(/^\uFEFF/, "").split(/\r?\n/);
 
   for (const [index, rawLine] of lines.entries()) {
     const line = rawLine.trim();
-    if (!line || line.startsWith('#')) continue;
+    if (!line || line.startsWith("#")) continue;
 
-    const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    const match = line.match(
+      /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/,
+    );
     if (!match) {
       fail(`${label}:${index + 1} has invalid KEY=value format.`);
     }
@@ -34,12 +36,13 @@ function parseEnvContent(contents, label) {
 }
 
 function parseValue(rawValue, label, lineNumber) {
-  if (!rawValue) return '';
+  if (!rawValue) return "";
 
   const quote = rawValue[0];
   if (quote === '"') {
     const match = rawValue.match(/^("(?:\\.|[^"\\])*")(?:\s+#.*)?$/);
-    if (!match) fail(`${label}:${lineNumber} has an unterminated quoted value.`);
+    if (!match)
+      fail(`${label}:${lineNumber} has an unterminated quoted value.`);
     try {
       return JSON.parse(match[1]);
     } catch {
@@ -47,51 +50,76 @@ function parseValue(rawValue, label, lineNumber) {
     }
   }
 
-  if (quote === "'" || quote === '`') {
-    const escapedQuote = quote === "'" ? "'" : '`';
-    const match = rawValue.match(new RegExp(`^${escapedQuote}([^${escapedQuote}]*)${escapedQuote}(?:\\\\s+#.*)?$`));
-    if (!match) fail(`${label}:${lineNumber} has an unterminated quoted value.`);
+  if (quote === "'" || quote === "`") {
+    const escapedQuote = quote === "'" ? "'" : "`";
+    const match = rawValue.match(
+      new RegExp(
+        `^${escapedQuote}([^${escapedQuote}]*)${escapedQuote}(?:\\\\s+#.*)?$`,
+      ),
+    );
+    if (!match)
+      fail(`${label}:${lineNumber} has an unterminated quoted value.`);
     return match[1];
   }
 
-  return rawValue.replace(/\s+#.*$/, '').trim();
+  return rawValue.replace(/\s+#.*$/, "").trim();
 }
 
 function readSchema(schemaPath, workspaceName) {
   let schema;
   try {
-    schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+    schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
   } catch (error) {
-    fail(`${path.relative(path.dirname(path.dirname(schemaPath)), schemaPath)} is not valid JSON: ${error.message}`);
+    fail(
+      `${path.relative(path.dirname(path.dirname(schemaPath)), schemaPath)} is not valid JSON: ${error.message}`,
+    );
   }
 
   const properties = schema.properties;
-  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+  if (
+    !properties ||
+    typeof properties !== "object" ||
+    Array.isArray(properties)
+  ) {
     fail(`${workspaceName}/env.schema.json must declare properties.`);
   }
 
-  for (const listName of ['requiredKeys', 'sharedKeys', 'runtimeOnlyKeys', 'runtimeRequiredKeys']) {
-    if (schema[listName] === undefined && listName.startsWith('runtime')) {
+  for (const listName of [
+    "requiredKeys",
+    "sharedKeys",
+    "runtimeOnlyKeys",
+    "runtimeRequiredKeys",
+  ]) {
+    if (schema[listName] === undefined && listName.startsWith("runtime")) {
       schema[listName] = [];
     }
     if (!Array.isArray(schema[listName])) {
-      fail(`${workspaceName}/env.schema.json must declare ${listName} as an array.`);
+      fail(
+        `${workspaceName}/env.schema.json must declare ${listName} as an array.`,
+      );
     }
     for (const key of schema[listName]) {
       if (!Object.hasOwn(properties, key)) {
-        fail(`${workspaceName}/env.schema.json refers to undeclared key ${key}.`);
+        fail(
+          `${workspaceName}/env.schema.json refers to undeclared key ${key}.`,
+        );
       }
     }
   }
 
-  if (typeof schema.targetPrefix !== 'string' || !keyPattern.test(schema.targetPrefix)) {
+  if (
+    typeof schema.targetPrefix !== "string" ||
+    !keyPattern.test(schema.targetPrefix)
+  ) {
     fail(`${workspaceName}/env.schema.json must declare a valid targetPrefix.`);
   }
 
   const runtimeOnlyKeys = new Set(schema.runtimeOnlyKeys);
   for (const key of schema.runtimeRequiredKeys) {
     if (!runtimeOnlyKeys.has(key)) {
-      fail(`${workspaceName}/env.schema.json marks ${key} runtime-required but not runtime-only.`);
+      fail(
+        `${workspaceName}/env.schema.json marks ${key} runtime-required but not runtime-only.`,
+      );
     }
   }
 
@@ -99,9 +127,11 @@ function readSchema(schemaPath, workspaceName) {
     if (
       !keyPattern.test(key) ||
       isForbiddenKey(key, schema) ||
-      !['string', 'integer', 'boolean', 'enum'].includes(properties[key].type)
+      !["string", "integer", "boolean", "enum"].includes(properties[key].type)
     ) {
-      fail(`${workspaceName}/env.schema.json contains an invalid key definition: ${key}.`);
+      fail(
+        `${workspaceName}/env.schema.json contains an invalid key definition: ${key}.`,
+      );
     }
   }
 
@@ -111,8 +141,12 @@ function readSchema(schemaPath, workspaceName) {
 function isForbiddenKey(key, schema) {
   const normalizedKey = key.toUpperCase();
   return (
-    (schema.forbiddenKeys || []).some((forbiddenKey) => normalizedKey === forbiddenKey.toUpperCase()) ||
-    (schema.forbiddenKeyPatterns || []).some((pattern) => normalizedKey.includes(pattern.toUpperCase()))
+    (schema.forbiddenKeys || []).some(
+      (forbiddenKey) => normalizedKey === forbiddenKey.toUpperCase(),
+    ) ||
+    (schema.forbiddenKeyPatterns || []).some((pattern) =>
+      normalizedKey.includes(pattern.toUpperCase()),
+    )
   );
 }
 
@@ -125,7 +159,7 @@ function discoverTargets(rootDir) {
 
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      const schemaPath = path.join(directory, entry.name, 'env.schema.json');
+      const schemaPath = path.join(directory, entry.name, "env.schema.json");
       if (fs.existsSync(schemaPath)) {
         targets.push(readSchema(schemaPath, path.join(rootName, entry.name)));
       }
@@ -141,17 +175,18 @@ function sourceKeyFor(target, key) {
 }
 
 function validateValue(key, value, definition, location) {
-  if (!value && !definition.allowEmpty) {
+  if (!value) {
+    if (definition.allowEmpty) return;
     fail(`${location} has an empty value for ${key}.`);
   }
 
-  if (definition.type === 'enum' && !definition.values.includes(value)) {
+  if (definition.type === "enum" && !definition.values.includes(value)) {
     fail(`${location} has an unsupported value for ${key}.`);
   }
-  if (definition.type === 'boolean' && value !== 'true' && value !== 'false') {
+  if (definition.type === "boolean" && value !== "true" && value !== "false") {
     fail(`${location} requires true or false for ${key}.`);
   }
-  if (definition.type === 'integer') {
+  if (definition.type === "integer") {
     if (!/^\d+$/.test(value)) {
       fail(`${location} requires an integer for ${key}.`);
     }
@@ -166,13 +201,17 @@ function validateValue(key, value, definition, location) {
       fail(`${location} has an out-of-range value for ${key}.`);
     }
   }
-  if (definition.type === 'string' && definition.pattern && !new RegExp(definition.pattern).test(value)) {
+  if (
+    definition.type === "string" &&
+    definition.pattern &&
+    !new RegExp(definition.pattern).test(value)
+  ) {
     fail(`${location} has an invalid value format for ${key}.`);
   }
   if (
-    definition.type === 'string' &&
+    definition.type === "string" &&
     definition.minLength !== undefined &&
-    Buffer.byteLength(value, 'utf8') < definition.minLength
+    Buffer.byteLength(value, "utf8") < definition.minLength
   ) {
     fail(`${location} has a value that is too short for ${key}.`);
   }
@@ -185,30 +224,49 @@ function serializeValue(value) {
   return value;
 }
 
-function generateEnvironments({ rootDir, mode, targetName, hostEnv = process.env, sourceFile, outputDir }) {
-  if (mode !== 'build' && mode !== 'runtime') {
+function generateEnvironments({
+  rootDir,
+  mode,
+  targetName,
+  hostEnv = process.env,
+  sourceFile,
+  outputDir,
+}) {
+  if (mode !== "build" && mode !== "runtime") {
     fail('Environment mode must be "build" or "runtime".');
   }
 
   const targets = discoverTargets(rootDir);
-  if (!targets.length) fail('No workspace env.schema.json files were found.');
+  if (!targets.length) fail("No workspace env.schema.json files were found.");
 
   const selectedTargets = targetName
-    ? targets.filter((target) => path.basename(target.workspaceName) === targetName)
+    ? targets.filter(
+        (target) => path.basename(target.workspaceName) === targetName,
+      )
     : targets;
   if (!selectedTargets.length) {
     fail(`No workspace declares an env.schema.json for ${targetName}.`);
   }
 
-  const envPath = sourceFile ? path.resolve(rootDir, sourceFile) : path.join(rootDir, '.env');
+  const envPath = sourceFile
+    ? path.resolve(rootDir, sourceFile)
+    : path.join(rootDir, ".env");
   if (sourceFile && !fs.existsSync(envPath)) {
     fail(`Environment source file does not exist: ${envPath}.`);
   }
   const envLabel = path.relative(rootDir, envPath) || path.basename(envPath);
-  const fileValues = fs.existsSync(envPath) ? parseEnvContent(fs.readFileSync(envPath, 'utf8'), envLabel) : new Map();
-  const generatedDir = outputDir ? path.resolve(rootDir, outputDir) : path.join(rootDir, '.generated', 'env');
+  const fileValues = fs.existsSync(envPath)
+    ? parseEnvContent(fs.readFileSync(envPath, "utf8"), envLabel)
+    : new Map();
+  const generatedDir = outputDir
+    ? path.resolve(rootDir, outputDir)
+    : path.join(rootDir, ".generated", "env");
   const sourceKeys = new Set(
-    targets.flatMap((target) => Object.keys(target.schema.properties).map((key) => sourceKeyFor(target, key))),
+    targets.flatMap((target) =>
+      Object.keys(target.schema.properties).map((key) =>
+        sourceKeyFor(target, key),
+      ),
+    ),
   );
 
   for (const key of fileValues.keys()) {
@@ -220,7 +278,10 @@ function generateEnvironments({ rootDir, mode, targetName, hostEnv = process.env
   const generated = selectedTargets.map((target) => {
     const { schema, workspaceName } = target;
     const runtimeOnlyKeys = new Set(schema.runtimeOnlyKeys);
-    const requiredKeys = new Set([...schema.requiredKeys, ...(mode === 'runtime' ? schema.runtimeRequiredKeys : [])]);
+    const requiredKeys = new Set([
+      ...schema.requiredKeys,
+      ...(mode === "runtime" ? schema.runtimeRequiredKeys : []),
+    ]);
     const values = new Map();
 
     for (const [key, definition] of Object.entries(schema.properties)) {
@@ -232,10 +293,12 @@ function generateEnvironments({ rootDir, mode, targetName, hostEnv = process.env
             ? hostEnv[sourceKey]
             : fileValues.get(sourceKey);
 
-      if (mode === 'build' && runtimeOnlyKeys.has(key)) continue;
-      if (value === undefined || (value === '' && !definition.allowEmpty)) {
+      if (mode === "build" && runtimeOnlyKeys.has(key)) continue;
+      if (value === undefined || (value === "" && !definition.allowEmpty)) {
         if (requiredKeys.has(key)) {
-          fail(`${sourceKey} is required for ${workspaceName} ${mode} configuration.`);
+          fail(
+            `${sourceKey} is required for ${workspaceName} ${mode} configuration.`,
+          );
         }
         continue;
       }
@@ -244,7 +307,9 @@ function generateEnvironments({ rootDir, mode, targetName, hostEnv = process.env
       values.set(key, value);
     }
 
-    const output = [...values].map(([key, value]) => `${key}=${serializeValue(value)}`).join('\n');
+    const output = [...values]
+      .map(([key, value]) => `${key}=${serializeValue(value)}`)
+      .join("\n");
     const targetId = path.basename(workspaceName);
     return {
       path: path.join(generatedDir, `${targetId}.${mode}.env`),
@@ -256,7 +321,7 @@ function generateEnvironments({ rootDir, mode, targetName, hostEnv = process.env
   for (const result of generated) {
     fs.mkdirSync(path.dirname(result.path), { recursive: true });
     fs.writeFileSync(result.path, result.output, {
-      encoding: 'utf8',
+      encoding: "utf8",
       mode: 0o600,
     });
   }
@@ -271,12 +336,17 @@ function parseArguments(args) {
   const options = {};
   for (let index = 0; index < args.length; index += 1) {
     const option = args[index];
-    if (option === '--target' || option === '--mode' || option === '--source-file' || option === '--output-dir') {
+    if (
+      option === "--target" ||
+      option === "--mode" ||
+      option === "--source-file" ||
+      option === "--output-dir"
+    ) {
       const value = args[index + 1];
-      if (!value || value.startsWith('--')) fail(`${option} requires a value.`);
+      if (!value || value.startsWith("--")) fail(`${option} requires a value.`);
       const optionKeys = {
-        '--source-file': 'sourceFile',
-        '--output-dir': 'outputDir',
+        "--source-file": "sourceFile",
+        "--output-dir": "outputDir",
       };
       const key = optionKeys[option] || option.slice(2);
       options[key] = value;
@@ -289,11 +359,16 @@ function parseArguments(args) {
 }
 
 function main() {
-  const rootDir = path.resolve(__dirname, '..');
-  const { mode, target: targetName, sourceFile, outputDir } = parseArguments(process.argv.slice(2));
+  const rootDir = path.resolve(__dirname, "..");
+  const {
+    mode,
+    target: targetName,
+    sourceFile,
+    outputDir,
+  } = parseArguments(process.argv.slice(2));
   const generated = generateEnvironments({
     rootDir,
-    mode: mode || 'build',
+    mode: mode || "build",
     targetName,
     sourceFile,
     outputDir,
