@@ -192,11 +192,11 @@ jobs:
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
-          SERVER_SSH_PORT: ${{ vars.SERVER_SSH_PORT || '5022' }}
-          SERVER_DEPLOY_ROOT: ${{ vars.SERVER_DEPLOY_ROOT }}
-          SERVER_NODE_ENV_ACTIVATE: ${{ vars.SERVER_NODE_ENV_ACTIVATE }}
-          SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE: ${{ vars.SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE }}
-          SERVER_AUTH_SERVICE_APP_ROOT: ${{ vars.SERVER_AUTH_SERVICE_APP_ROOT }}
+          SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT || '5022' }}
+          SERVER_DEPLOY_ROOT: ${{ secrets.SERVER_DEPLOY_ROOT }}
+          SERVER_NODE_ENV_ACTIVATE: ${{ secrets.SERVER_NODE_ENV_ACTIVATE }}
+          SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE: ${{ secrets.SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE }}
+          SERVER_AUTH_SERVICE_APP_ROOT: ${{ secrets.SERVER_AUTH_SERVICE_APP_ROOT }}
           REPOSITORY: ${{ github.repository }}
           DEPLOY_MODE: ${{ inputs.mode }}
         shell: bash
