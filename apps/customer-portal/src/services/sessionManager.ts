@@ -7,9 +7,13 @@ let inflight: Promise<string | null> | null = null;
 
 async function performRefresh(): Promise<string | null> {
   try {
-    // `kgpay_csrf` est limité au chemin /auth : il faut le demander au serveur avant chaque refresh.
+    // Le jeton CSRF du portail est limité au chemin /auth et renouvelé avant chaque refresh.
     const { csrfToken } = await authService.getCsrf();
     const tokens = await authService.refresh(csrfToken);
+    if (tokens.subjectType !== "CUSTOMER") {
+      useSessionStore.getState().clearSession();
+      return null;
+    }
     useSessionStore.getState().setSession(tokens);
     return tokens.accessToken;
   } catch (error) {

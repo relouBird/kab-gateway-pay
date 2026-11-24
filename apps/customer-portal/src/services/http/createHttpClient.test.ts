@@ -7,7 +7,10 @@ import { createHttpClient } from "./createHttpClient";
 
 function setup(
   responses: number[],
-  overrides: { refresh?: () => Promise<string | null> } = {},
+  overrides: {
+    refresh?: () => Promise<string | null>;
+    defaultHeaders?: Readonly<Record<string, string>>;
+  } = {},
 ) {
   const seen: InternalAxiosRequestConfig[] = [];
   const refreshAccessToken = vi.fn(
@@ -24,6 +27,7 @@ function setup(
       token = next;
       return next;
     },
+    defaultHeaders: overrides.defaultHeaders,
   });
   const adapter: AxiosAdapter = (config) => {
     seen.push(config);
@@ -48,6 +52,16 @@ describe("createHttpClient", () => {
     expect(headers?.get("X-Correlation-Id")).toBeTruthy();
     expect(headers?.get("Accept-Language")).toBe("en");
     expect(headers?.has("Authorization")).toBe(false);
+  });
+
+  it("transmet le contexte du portail configuré", async () => {
+    const { client, seen } = setup([200], {
+      defaultHeaders: { "X-KGPay-Portal": "CUSTOMER" },
+    });
+
+    await client.get("/auth/csrf");
+
+    expect(seen[0]?.headers.get("X-KGPay-Portal")).toBe("CUSTOMER");
   });
 
   it("n'envoie le jeton que sur demande explicite", async () => {

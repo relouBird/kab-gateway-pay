@@ -22,4 +22,5 @@ export const authApi: AxiosInstance = createHttpClient({
   isAccessTokenExpiring,
   getLanguage: () => i18n.language,
   refreshAccessToken: () => refreshHandler(),
+  defaultHeaders: { "X-KGPay-Portal": "CUSTOMER" },
 });

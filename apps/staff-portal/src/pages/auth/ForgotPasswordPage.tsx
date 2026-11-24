@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   createResetPasswordSchema,
@@ -24,6 +24,7 @@ const resetPasswordSchema = createResetPasswordSchema(env.passwordMinLength);
 
 export function ForgotPasswordPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const emailForm = useYupForm({
     formId: "staff-forgot",
     schema: forgotPasswordSchema,
@@ -70,9 +71,10 @@ export function ForgotPasswordPage() {
         code: values.code,
         newPassword: values.newPassword,
       });
-      setMessage(t("success"));
-      setChallengeId("");
-      resetForm.reset();
+      void navigate("/login", {
+        replace: true,
+        state: { passwordReset: true },
+      });
     } catch {
       setError(t("genericError"));
     } finally {

@@ -395,6 +395,7 @@ export class AuthService {
     input: LoginDto,
     locale: 'en' | 'fr',
     metadata: RequestMetadata,
+    expectedSubjectType?: SubjectType,
   ): Promise<{ challengeId: string; expiresAt: Date }> {
     const now = new Date();
     const email = normalizeEmail(input.email);
@@ -426,6 +427,14 @@ export class AuthService {
     }
     if (identityLocked) {
       await this.recordLoginFailure(identity.id, metadata, 'IDENTITY_LOCKED');
+      throw new UnauthorizedException(GENERIC_AUTH_FAILURE);
+    }
+    if (expectedSubjectType && identity.subjectType !== expectedSubjectType) {
+      await this.recordLoginFailure(
+        identity.id,
+        metadata,
+        'PORTAL_SUBJECT_MISMATCH',
+      );
       throw new UnauthorizedException(GENERIC_AUTH_FAILURE);
     }
 
@@ -488,6 +497,7 @@ export class AuthService {
   async verifyLogin(
     input: VerifyOtpDto,
     metadata: RequestMetadata,
+    expectedSubjectType?: SubjectType,
   ): Promise<AuthSessionResult> {
     const consumed = await this.otp.consume(
       input.challengeId,
@@ -507,6 +517,12 @@ export class AuthService {
             roles: { include: { role: { include: { permissions: true } } } },
           },
         });
+        if (
+          expectedSubjectType &&
+          identity.subjectType !== expectedSubjectType
+        ) {
+          throw new UnauthorizedException(GENERIC_AUTH_FAILURE);
+        }
         if (
           identity.status !== IdentityStatus.ACTIVE ||
           !identity.emailVerifiedAt ||
@@ -1437,14 +1453,30 @@ export class AuthService {
     });
   }
 
-  async logout(rawToken: string, metadata: RequestMetadata): Promise<void> {
+  async logout(
+    rawToken: string,
+    metadata: RequestMetadata,
+    expectedSubjectType?: SubjectType,
+  ): Promise<void> {
     const tokenHash = this.tokens.hashOpaqueToken(rawToken);
     const now = new Date();
     const token = await this.prisma.refreshToken.findUnique({
       where: { tokenHash },
-      select: { familyId: true, family: { select: { identityId: true } } },
+      select: {
+        familyId: true,
+        family: {
+          select: {
+            identityId: true,
+            identity: { select: { subjectType: true } },
+          },
+        },
+      },
     });
-    if (!token) {
+    if (
+      !token ||
+      (expectedSubjectType &&
+        token.family.identity.subjectType !== expectedSubjectType)
+    ) {
       return;
     }
     await this.prisma.$transaction(async (transaction) => {
@@ -1650,6 +1682,7 @@ export class AuthService {
   async refresh(
     rawToken: string,
     metadata: RequestMetadata,
+    expectedSubjectType?: SubjectType,
   ): Promise<AuthSessionResult> {
     const tokenHash = this.tokens.hashOpaqueToken(rawToken);
     const now = new Date();
@@ -1688,6 +1721,12 @@ export class AuthService {
         }
         const { family } = token;
         const identity = family.identity;
+        if (
+          expectedSubjectType &&
+          identity.subjectType !== expectedSubjectType
+        ) {
+          return { state: 'invalid' as const };
+        }
         if (token.consumedAt) {
           if (!family.revokedAt) {
             await transaction.sessionFamily.update({

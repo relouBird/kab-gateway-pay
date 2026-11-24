@@ -34,6 +34,7 @@ async function bootstrap() {
       'Content-Type',
       'X-Correlation-Id',
       'X-CSRF-Token',
+      'X-KGPay-Portal',
       'X-Step-Up-Proof',
       'X-Service-Client',
       'X-Service-Secret',
