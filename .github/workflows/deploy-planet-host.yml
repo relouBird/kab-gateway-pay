@@ -1,8 +1,8 @@
 name: Build and deploy KG Pay to PlanetHoster
 
 # Workflow interne partagé par le premier déploiement et les déploiements normaux.
-# Il construit les artefacts sur GitHub, les transfère vers PH, publie la release,
-# puis remplace et redémarre uniquement le runtime d'auth-service.
+# Il construit les artefacts et génère la configuration runtime sur GitHub,
+# les transfère séparément vers PH, publie la release et redémarre auth-service.
 on:
   workflow_call:
     inputs:
@@ -76,7 +76,7 @@ jobs:
             scripts/bump-version.test.cjs \
             deploy-tools/release-manager.test.cjs
 
-      - name: Build all workspaces
+      - name: Build workspaces and generate production runtime environments
         env:
           # Secret unique contenant le contenu complet de .env.prod; ne jamais l'afficher.
           KG_PAY_APP_ENV: ${{ secrets.KG_PAY_APP_ENV }}
@@ -90,10 +90,23 @@ jobs:
           test -n "$KG_PAY_APP_ENV"
           printf '%s' "$KG_PAY_APP_ENV" > .env
           unset KG_PAY_APP_ENV
-          # La génération build filtre les variables runtimeOnly; rien n'est transféré dans l'archive.
+          # Le build filtre les secrets runtime; la génération runtime produit le fichier transmis séparément.
           pnpm run build
+          pnpm run env:runtime
 
-      # Regroupe les sorties statiques et le runtime autonome; aucun .env n'entre dans l'archive.
+          generated_runtime_env=".generated/env/auth-service.runtime.env"
+          runtime_env="$RUNNER_TEMP/kgpay-auth-service-runtime.env"
+          if [[ ! -s "$generated_runtime_env" ]]; then
+            echo "::error::auth-service production runtime environment was not generated."
+            exit 1
+          fi
+          if ! grep -Eq '^NODE_ENV=production\r?$' "$generated_runtime_env"; then
+            echo "::error::auth-service runtime environment must configure production mode."
+            exit 1
+          fi
+          install -m 600 "$generated_runtime_env" "$runtime_env"
+
+      # Regroupe les sorties statiques et le runtime autonome; aucun .env ni runtime env n'entre dans l'archive.
       - name: Package static builds and auth-service runtime
         shell: bash
         run: |
@@ -190,7 +203,7 @@ jobs:
           printf '%s\n' "$SSH_PRIVATE_KEY" > "$RUNNER_TEMP/deploy_key"
           chmod 600 "$RUNNER_TEMP/deploy_key"
 
-      # Valide les chemins, transfère l'archive, puis exécute les opérations sur PH par SSH.
+      # Valide les chemins, transfère l'archive et le runtime env privé, puis déploie sur PH par SSH.
       - name: Deploy dated release on PlanetHoster
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
@@ -270,11 +283,16 @@ jobs:
             exit 1
           fi
 
-          # Rien n'est installé ou compilé sur PH: le serveur reçoit l'archive déjà construite.
+          # Aucun build pnpm n'a lieu sur PH: seul le clone source est conservé pour les opérations manuelles.
           archive="$RUNNER_TEMP/kgpay-build.tar.gz"
+          runtime_env="$RUNNER_TEMP/kgpay-auth-service-runtime.env"
           manager="$GITHUB_WORKSPACE/deploy-tools/release-manager.cjs"
           if [[ ! -f "$archive" ]]; then
             echo "::error::The packaged release archive is missing from the runner."
+            exit 1
+          fi
+          if [[ ! -s "$runtime_env" ]]; then
+            echo "::error::The generated auth-service runtime environment is missing from the runner."
             exit 1
           fi
           if [[ ! -f "$manager" ]]; then
@@ -283,6 +301,7 @@ jobs:
           fi
           remote="$SERVER_USER@$SERVER_HOST"
           archive_name="kgpay-build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
+          runtime_env_name="auth-service-runtime-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.env"
           manager_name="release-manager-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.cjs"
 
           printf -v prepare_command 'bash -s -- %q' "$SERVER_DEPLOY_ROOT"
@@ -294,9 +313,11 @@ jobs:
             "$remote" "$prepare_command" <<'REMOTE'
           set -eE
           trap 'status=$?; printf "Remote upload-directory preparation failed at script line %s (exit %s).\n" "$LINENO" "$status" >&2; exit "$status"' ERR
+            umask 077
           root="$1"
             # Les uploads sont privés et temporaires; le release manager les nettoie après publication.
           mkdir -p "$root/incoming"
+            chmod 700 "$root/incoming"
           REMOTE
 
           scp -i "$RUNNER_TEMP/deploy_key" \
@@ -311,8 +332,14 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             "$manager" "$remote:$SERVER_DEPLOY_ROOT/incoming/$manager_name"
+          scp -p -i "$RUNNER_TEMP/deploy_key" \
+            -P "$SERVER_SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "$runtime_env" "$remote:$SERVER_DEPLOY_ROOT/incoming/$runtime_env_name"
 
-          printf -v deploy_command 'bash -s -- %q %q %q %q %q %q %q %q %q' \
+          printf -v deploy_command 'bash -s -- %q %q %q %q %q %q %q %q %q %q' \
             "$SERVER_DEPLOY_ROOT" \
             "$SERVER_NODE_ENV_ACTIVATE" \
             "$SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE" \
@@ -320,6 +347,7 @@ jobs:
             "$GITHUB_SHA" \
             "$archive_name" \
             "$manager_name" \
+            "$runtime_env_name" \
             "$REPOSITORY" \
             "$DEPLOY_MODE"
           ssh -i "$RUNNER_TEMP/deploy_key" \
@@ -337,11 +365,45 @@ jobs:
           expected_commit="$5"
           archive_name="$6"
           manager_name="$7"
-          repository="$8"
-          mode="$9"
+          runtime_env_name="$8"
+          repository="$9"
+          mode="${10}"
           repository_dir="$root/repository"
           archive="$root/incoming/$archive_name"
           manager="$root/incoming/$manager_name"
+          runtime_env_upload="$root/incoming/$runtime_env_name"
+          runtime_env_file="$auth_app_root/.generated/env/auth-service.runtime.env"
+          runtime_env_stage="$auth_app_root/.generated/env-stage-$archive_name"
+          runtime_env_next="$runtime_env_file.next-$archive_name"
+          runtime_source="$root/dist/services/auth-service"
+          runtime_dir="$auth_app_root/runtime"
+          runtime_stage="$auth_app_root/.runtime-next-$archive_name"
+          runtime_previous="$auth_app_root/.runtime-previous-$archive_name"
+          runtime_previous_moved=0
+          runtime_env_stage_owned=0
+          runtime_env_next_owned=0
+          runtime_stage_owned=0
+
+          cleanup_runtime() {
+            if [ -e "$runtime_env_upload" ]; then
+              rm -f -- "$runtime_env_upload"
+            fi
+            if [ "$runtime_env_stage_owned" -eq 1 ] && [ -d "$runtime_env_stage" ]; then
+              rm -rf -- "$runtime_env_stage"
+            fi
+            if [ "$runtime_env_next_owned" -eq 1 ] && [ -e "$runtime_env_next" ]; then
+              rm -f -- "$runtime_env_next"
+            fi
+            if [ "$runtime_stage_owned" -eq 1 ] && [ -d "$runtime_stage" ]; then
+              rm -rf -- "$runtime_stage"
+            fi
+            if [ "$runtime_previous_moved" -eq 1 ] &&
+              [ ! -e "$runtime_dir" ] &&
+              [ -e "$runtime_previous" ]; then
+              mv "$runtime_previous" "$runtime_dir"
+            fi
+          }
+          trap cleanup_runtime EXIT
 
           # Vérifie les environnements Node des utilitaires et du service avant toute modification.
           if [ ! -f "$deploy_node_env" ]; then
@@ -356,16 +418,16 @@ jobs:
             echo "ERROR: SERVER_AUTH_SERVICE_APP_ROOT does not exist or is not a directory."
             exit 1
           fi
-          # Le .env source est déposé manuellement sur PH et reste hors des releases.
-          source_env_file="$auth_app_root/.env"
-          runtime_env_file="$auth_app_root/.generated/env/auth-service.runtime.env"
-          runtime_env_stage="$auth_app_root/.generated/env-stage-$archive_name"
-          if [ ! -f "$source_env_file" ]; then
-            echo "ERROR: Upload the production application .env to the private auth-service app root."
+          if [ ! -s "$runtime_env_upload" ]; then
+            echo "ERROR: Uploaded auth-service runtime environment is missing from the private incoming directory."
             exit 1
           fi
           if [ -e "$runtime_env_stage" ]; then
             echo "ERROR: An earlier runtime environment generation is incomplete."
+            exit 1
+          fi
+          if [ -e "$runtime_env_next" ]; then
+            echo "ERROR: An earlier runtime environment promotion is incomplete."
             exit 1
           fi
           if [ ! -f "$archive" ]; then
@@ -390,6 +452,23 @@ jobs:
           esac
           command -v cp >/dev/null 2>&1 || {
             echo "ERROR: cp is required on the server."
+            exit 1
+          }
+          command -v chmod >/dev/null 2>&1 || {
+            echo "ERROR: chmod is required on the server."
+            exit 1
+          }
+
+          # Stage uniquement le fichier runtime filtré généré depuis le profil de production sur GitHub.
+          mkdir -p "$auth_app_root/.generated"
+          chmod 700 "$auth_app_root/.generated"
+          mkdir -m 700 "$runtime_env_stage"
+          runtime_env_stage_owned=1
+          staged_runtime_env="$runtime_env_stage/auth-service.runtime.env"
+          mv "$runtime_env_upload" "$staged_runtime_env"
+          chmod 600 "$staged_runtime_env"
+          grep -Eq '^NODE_ENV=production\r?$' "$staged_runtime_env" || {
+            echo "ERROR: Uploaded auth-service runtime environment is not configured for production."
             exit 1
           }
 
@@ -438,28 +517,6 @@ jobs:
             exit 1
           fi
 
-          trap 'rm -rf -- "$runtime_env_stage"' EXIT
-          # Transforme les clés suffixées du .env source en variables runtime non suffixées.
-          # La source explicite est prioritaire; les valeurs du shell ne remplacent pas la configuration PH.
-          (
-            source "$deploy_node_env"
-            set -u
-            node "$repository_dir/scripts/generate-env.cjs" \
-              --target auth-service \
-              --mode runtime \
-              --source-file "$source_env_file" \
-              --output-dir "$runtime_env_stage"
-          )
-          staged_runtime_env="$runtime_env_stage/auth-service.runtime.env"
-          if [ ! -f "$staged_runtime_env" ]; then
-            echo "ERROR: Runtime environment generation did not produce auth-service.runtime.env."
-            exit 1
-          fi
-          grep -Eq '^NODE_ENV=production\r?$' "$staged_runtime_env" || {
-            echo "ERROR: The private auth-service .env must configure production mode."
-            exit 1
-          }
-
           (
             source "$deploy_node_env"
             set -u
@@ -470,31 +527,6 @@ jobs:
               --deploy-root "$root" \
               --commit "$expected_commit"
           )
-
-          runtime_source="$root/dist/services/auth-service"
-          runtime_dir="$auth_app_root/runtime"
-          runtime_stage="$auth_app_root/.runtime-next-$archive_name"
-          runtime_previous="$auth_app_root/.runtime-previous-$archive_name"
-          runtime_env_next="$runtime_env_file.next-$archive_name"
-          runtime_previous_moved=0
-          # Si l'activation échoue, restaure l'ancien runtime au lieu de laisser l'application absente.
-          cleanup_runtime() {
-            if [ -d "$runtime_env_stage" ]; then
-              rm -rf -- "$runtime_env_stage"
-            fi
-            if [ -e "$runtime_env_next" ]; then
-              rm -f -- "$runtime_env_next"
-            fi
-            if [ -d "$runtime_stage" ]; then
-              rm -rf -- "$runtime_stage"
-            fi
-            if [ "$runtime_previous_moved" -eq 1 ] &&
-              [ ! -e "$runtime_dir" ] &&
-              [ -e "$runtime_previous" ]; then
-              mv "$runtime_previous" "$runtime_dir"
-            fi
-          }
-          trap cleanup_runtime EXIT
 
           # Ne remplace que runtime/; .generated/env et les clés privées restent hors du paquet.
           if [ ! -d "$runtime_source" ]; then
@@ -523,6 +555,7 @@ jobs:
           fi
 
           mkdir "$runtime_stage"
+          runtime_stage_owned=1
           cp -a "$runtime_source/." "$runtime_stage/"
           if [ -e "$runtime_dir" ]; then
             mv "$runtime_dir" "$runtime_previous"
@@ -532,20 +565,20 @@ jobs:
             echo "ERROR: Could not activate the new auth-service runtime."
             exit 1
           fi
+          runtime_stage_owned=0
           if [ "$runtime_previous_moved" -eq 1 ]; then
             rm -rf -- "$runtime_previous"
             runtime_previous_moved=0
           fi
 
-          # Publie atomiquement la configuration générée; le .env source et les clés restent intacts.
+          # Publie atomiquement le runtime généré; la source complète n'est pas présente sur PH.
           mkdir -p "$(dirname "$runtime_env_file")"
-          if [ -e "$runtime_env_next" ]; then
-            echo "ERROR: An earlier runtime environment promotion is incomplete."
-            exit 1
-          fi
           mv "$staged_runtime_env" "$runtime_env_next"
+          runtime_env_next_owned=1
           mv "$runtime_env_next" "$runtime_env_file"
+          runtime_env_next_owned=0
           rmdir "$runtime_env_stage"
+          runtime_env_stage_owned=0
           trap - EXIT
 
           (
@@ -563,3 +596,8 @@ jobs:
           rm -f -- "$archive" "$manager"
           echo "Deployment successful: $expected_commit"
           REMOTE
+
+      - name: Remove temporary production runtime environment
+        if: always()
+        shell: bash
+        run: rm -f -- "$RUNNER_TEMP/kgpay-auth-service-runtime.env"
