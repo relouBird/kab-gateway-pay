@@ -167,3 +167,14 @@ Consigner le processus de build centralisé, le dépôt privé d'artefacts par S
 - **Validations :** Prettier sur le workflow, le README, l'ADR et le journal — réussi; `git diff --check` — réussi. Validation du workflow et connexion PlanetHoster — non exécutées.
 - **Points ouverts :** aucun paramètre `SERVER_SSH_KNOWN_HOSTS` n'est requis; le timeout TCP observé auparavant reste indépendant de cette vérification.
 - **Suite attendue :** relancer la connexion une fois que l'accès SSH PlanetHoster répond sur le port configuré.
+
+## Mise à jour — diagnostics du workflow PlanetHoster
+
+- **Objectif :** rendre les échecs de validation et de commandes SSH distantes compréhensibles sans exposer les valeurs des secrets.
+- **Statut :** terminé localement; nouveau workflow à pousser et à relancer pour confirmer le diagnostic sur PH.
+- **Résumé :** les paramètres d'hôte, d'utilisateur, de port et de chemins produisent maintenant un message d'erreur explicite si leur format est invalide. Les commandes Bash/SSH signalent la ligne distante en échec; les fichiers et répertoires prérequis ont également des messages ciblés. Mise à jour de la documentation pour refléter que la configuration `SERVER_*` est fournie par les secrets GitHub `production`.
+- **Chemins modifiés :** `.github/workflows/deploy-planet-host.yml`, `README.md`, `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`.
+- **Décision concernée :** ADR-002 §14, déploiement PlanetHoster et configuration de l'environnement GitHub.
+- **Validations :** Prettier sur le workflow, le README, l'ADR et le journal — réussi; `git diff --check` — réussi; validation `bash -n` des 6 blocs `run` avec Git Bash — réussie. `actionlint` indisponible; aucun déploiement distant lancé.
+- **Points ouverts :** les logs du run précédent masquent toutes les valeurs `SERVER_*` et ne donnent pas l'erreur précise; la prochaine exécution devra confirmer si un paramètre invalide ou une commande distante échoue.
+- **Suite attendue :** valider le workflow localement, pousser la correction puis relancer le déploiement. Ne pas partager les valeurs des secrets.

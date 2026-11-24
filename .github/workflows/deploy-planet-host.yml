@@ -44,10 +44,10 @@ jobs:
             echo "Unknown deployment mode: $DEPLOY_MODE"
             exit 1
           fi
-          test -n "$KG_PAY_APP_ENV" || {
-            echo "KG_PAY_APP_ENV is required in the production environment."
+          if [[ -z "$KG_PAY_APP_ENV" ]]; then
+            echo "::error::KG_PAY_APP_ENV is required in the production environment."
             exit 1
-          }
+          fi
 
       # La construction et la préparation des dépendances ont lieu sur le runner GitHub.
       - name: Check out source
@@ -179,12 +179,15 @@ jobs:
       # Prépare la clé privée SSH. La vérification de la clé d'hôte est désactivée plus bas.
       - name: Configure SSH
         env:
-          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$SERVER_SSH_KEY"
-          printf '%s\n' "$SERVER_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          if [[ -z "$SSH_PRIVATE_KEY" ]]; then
+            echo "::error::SSH_PRIVATE_KEY is empty or unavailable in the production environment."
+            exit 1
+          fi
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$RUNNER_TEMP/deploy_key"
           chmod 600 "$RUNNER_TEMP/deploy_key"
 
       # Valide les chemins, transfère l'archive, puis exécute les opérations sur PH par SSH.
@@ -201,44 +204,83 @@ jobs:
           DEPLOY_MODE: ${{ inputs.mode }}
         shell: bash
         run: |
-          set -euo pipefail
-          [[ "$SERVER_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
-          [[ "$SERVER_USER" =~ ^[A-Za-z0-9._-]+$ ]]
-          [[ "$SERVER_SSH_PORT" =~ ^[0-9]+$ ]]
-          test "$SERVER_SSH_PORT" -ge 1
-          test "$SERVER_SSH_PORT" -le 65535
+          set -Eeuo pipefail
+          trap 'status=$?; echo "::error::Deploy step failed on the runner at script line ${LINENO} (exit ${status})."; exit "$status"' ERR
 
-          for path_value in \
-            "$SERVER_DEPLOY_ROOT" \
-            "$SERVER_NODE_ENV_ACTIVATE" \
-            "$SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE" \
-            "$SERVER_AUTH_SERVICE_APP_ROOT"; do
-            [[ "$path_value" =~ ^/[A-Za-z0-9._/-]+$ ]]
-            [[ "$path_value" != *".."* ]]
+          if [[ ! "$SERVER_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "::error::SERVER_HOST is missing or invalid; provide a hostname or IP only, without scheme or port."
+            exit 1
+          fi
+          if [[ ! "$SERVER_USER" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::SERVER_USER is missing or invalid; provide the account name only."
+            exit 1
+          fi
+          if [[ ! "$SERVER_SSH_PORT" =~ ^[0-9]+$ ]] ||
+            ! test "$SERVER_SSH_PORT" -ge 1 2>/dev/null ||
+            ! test "$SERVER_SSH_PORT" -le 65535 2>/dev/null; then
+            echo "::error::SERVER_SSH_PORT must be a number from 1 to 65535 (default: 5022)."
+            exit 1
+          fi
+
+          for path_name in \
+            SERVER_DEPLOY_ROOT \
+            SERVER_NODE_ENV_ACTIVATE \
+            SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE \
+            SERVER_AUTH_SERVICE_APP_ROOT; do
+            path_value="${!path_name}"
+            if [[ ! "$path_value" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+              echo "::error::$path_name must be a literal absolute Linux path without spaces, variables, or special characters."
+              exit 1
+            fi
+            if [[ "$path_value" == *".."* ]]; then
+              echo "::error::$path_name must not contain '..'."
+              exit 1
+            fi
           done
-          [[ "$SERVER_DEPLOY_ROOT" != "/" ]]
-          [[ "$SERVER_AUTH_SERVICE_APP_ROOT" != "/" ]]
-          [[ "$SERVER_NODE_ENV_ACTIVATE" != "$SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE" ]]
+          if [[ "$SERVER_DEPLOY_ROOT" == "/" ]]; then
+            echo "::error::SERVER_DEPLOY_ROOT must not be the filesystem root."
+            exit 1
+          fi
+          if [[ "$SERVER_AUTH_SERVICE_APP_ROOT" == "/" ]]; then
+            echo "::error::SERVER_AUTH_SERVICE_APP_ROOT must not be the filesystem root."
+            exit 1
+          fi
+          if [[ "$SERVER_NODE_ENV_ACTIVATE" == "$SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE" ]]; then
+            echo "::error::SERVER_NODE_ENV_ACTIVATE and SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE must be distinct."
+            exit 1
+          fi
           case "$SERVER_AUTH_SERVICE_APP_ROOT/" in
             "$SERVER_DEPLOY_ROOT/"*)
-              echo "SERVER_AUTH_SERVICE_APP_ROOT must be separate from SERVER_DEPLOY_ROOT."
+              echo "::error::SERVER_AUTH_SERVICE_APP_ROOT must be separate from SERVER_DEPLOY_ROOT."
               exit 1
               ;;
           esac
           case "$SERVER_DEPLOY_ROOT/" in
             "$SERVER_AUTH_SERVICE_APP_ROOT/"*)
-              echo "SERVER_DEPLOY_ROOT must be separate from SERVER_AUTH_SERVICE_APP_ROOT."
+              echo "::error::SERVER_DEPLOY_ROOT must be separate from SERVER_AUTH_SERVICE_APP_ROOT."
               exit 1
               ;;
           esac
-          [[ "$REPOSITORY" == "relouBird/kab-gateway-pay" ]]
-          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "$REPOSITORY" != "relouBird/kab-gateway-pay" ]]; then
+            echo "::error::Unexpected repository for the PlanetHoster deployment."
+            exit 1
+          fi
+          if [[ ! "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::GITHUB_SHA is not a full commit SHA."
+            exit 1
+          fi
 
           # Rien n'est installé ou compilé sur PH: le serveur reçoit l'archive déjà construite.
           archive="$RUNNER_TEMP/kgpay-build.tar.gz"
           manager="$GITHUB_WORKSPACE/deploy-tools/release-manager.cjs"
-          test -f "$archive"
-          test -f "$manager"
+          if [[ ! -f "$archive" ]]; then
+            echo "::error::The packaged release archive is missing from the runner."
+            exit 1
+          fi
+          if [[ ! -f "$manager" ]]; then
+            echo "::error::The release manager script is missing from the checkout."
+            exit 1
+          fi
           remote="$SERVER_USER@$SERVER_HOST"
           archive_name="kgpay-build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
           manager_name="release-manager-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.cjs"
@@ -250,7 +292,8 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             "$remote" "$prepare_command" <<'REMOTE'
-          set -eu
+          set -eE
+          trap 'status=$?; printf "Remote upload-directory preparation failed at script line %s (exit %s).\n" "$LINENO" "$status" >&2; exit "$status"' ERR
           root="$1"
             # Les uploads sont privés et temporaires; le release manager les nettoie après publication.
           mkdir -p "$root/incoming"
@@ -285,7 +328,8 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
             "$remote" "$deploy_command" <<'REMOTE'
-          set -e
+          set -eE
+          trap 'status=$?; printf "Remote deployment failed at script line %s (exit %s).\n" "$LINENO" "$status" >&2; exit "$status"' ERR
           root="$1"
           deploy_node_env="$2"
           auth_node_env="$3"
@@ -300,9 +344,18 @@ jobs:
           manager="$root/incoming/$manager_name"
 
           # Vérifie les environnements Node des utilitaires et du service avant toute modification.
-          test -f "$deploy_node_env"
-          test -f "$auth_node_env"
-          test -d "$auth_app_root"
+          if [ ! -f "$deploy_node_env" ]; then
+            echo "ERROR: SERVER_NODE_ENV_ACTIVATE does not point to an existing Node activation script."
+            exit 1
+          fi
+          if [ ! -f "$auth_node_env" ]; then
+            echo "ERROR: SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE does not point to an existing Node activation script."
+            exit 1
+          fi
+          if [ ! -d "$auth_app_root" ]; then
+            echo "ERROR: SERVER_AUTH_SERVICE_APP_ROOT does not exist or is not a directory."
+            exit 1
+          fi
           # Le .env source est déposé manuellement sur PH et reste hors des releases.
           source_env_file="$auth_app_root/.env"
           runtime_env_file="$auth_app_root/.generated/env/auth-service.runtime.env"
@@ -315,8 +368,14 @@ jobs:
             echo "ERROR: An earlier runtime environment generation is incomplete."
             exit 1
           fi
-          test -f "$archive"
-          test -f "$manager"
+          if [ ! -f "$archive" ]; then
+            echo "ERROR: Uploaded release archive is missing from the private incoming directory."
+            exit 1
+          fi
+          if [ ! -f "$manager" ]; then
+            echo "ERROR: Uploaded release manager is missing from the private incoming directory."
+            exit 1
+          fi
           case "$auth_app_root/" in
             "$root/"*)
               echo "ERROR: The auth-service app root must be separate from the release root."
@@ -392,7 +451,10 @@ jobs:
               --output-dir "$runtime_env_stage"
           )
           staged_runtime_env="$runtime_env_stage/auth-service.runtime.env"
-          test -f "$staged_runtime_env"
+          if [ ! -f "$staged_runtime_env" ]; then
+            echo "ERROR: Runtime environment generation did not produce auth-service.runtime.env."
+            exit 1
+          fi
           grep -Eq '^NODE_ENV=production\r?$' "$staged_runtime_env" || {
             echo "ERROR: The private auth-service .env must configure production mode."
             exit 1
@@ -435,7 +497,10 @@ jobs:
           trap cleanup_runtime EXIT
 
           # Ne remplace que runtime/; .generated/env et les clés privées restent hors du paquet.
-          test -d "$runtime_source"
+          if [ ! -d "$runtime_source" ]; then
+            echo "ERROR: The release manager did not publish the auth-service runtime source."
+            exit 1
+          fi
           if [ -e "$runtime_dir" ] && [ ! -d "$runtime_dir" ]; then
             echo "ERROR: auth-service runtime path exists but is not a directory."
             exit 1
