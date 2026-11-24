@@ -35,7 +35,7 @@ Le porteur valide ce CDC comme base de travail V1 le 21 novembre 2026. Le facteu
 
 ### 2.1 Dans le périmètre V1
 
-Authentification, sessions, MFA obligatoire pour les clients et le personnel, récupération de compte, rôles et permissions, comptes internes, step-up, journal des accès (ACCESS_EVENT), publication des clés de vérification (JWKS), événements d'identité.
+Authentification, sessions, MFA obligatoire pour les clients et le personnel, récupération de compte, rôles et permissions, comptes internes, step-up, journal des accès (ACCESS_EVENT), vérification locale des JWT par secret partagé, événements d'identité.
 
 Interfaces web responsive correspondantes : inscription client, vérification du contact, connexion, récupération du compte ; acceptation d'invitation et enrôlement MFA du personnel ; écrans de session et de déconnexion. Les règles backend demeurent l'autorité pour la validation et l'autorisation.
 
@@ -117,7 +117,7 @@ sequenceDiagram
     U->>A: OTP e-mail
     A-->>U: Access token court et refresh token
     U->>S: Requête avec access token
-    S->>S: Vérification locale via clé publique JWKS
+    S->>S: Vérification locale HS256 via secret runtime partagé
     S-->>U: Réponse
     U->>A: Refresh avec refresh token
     A->>A: Rotation et détection de réutilisation
@@ -155,8 +155,8 @@ Priorités : **P0** = indispensable V1, **P1** = V1 si possible, **P2** = après
 | IAM-F-02 | Unicité de l'adresse e-mail utilisée comme identifiant de connexion.                                                                                           | P0   | Une seconde inscription avec le même e-mail est refusée, sans révéler si le compte existe (message uniforme). Le numéro de téléphone n'est pas un identifiant et n'a pas à être unique.                                                                                |
 | IAM-F-03 | Création de comptes internes par invitation, avec vérification de l'adresse e-mail et MFA obligatoire par OTP e-mail.                                          | P0   | Seul `GLOBAL_SUPER_ADMIN` peut créer/inviter un compte STAFF. Le compte n'atteint `ACTIVE` qu'après définition du mot de passe et vérification de l'adresse ; chaque nouvelle connexion exige un OTP e-mail valide. Le lien d'invitation est à usage unique et expire. |
 | IAM-F-04 | Connexion par e-mail et mot de passe, suivie d'un OTP e-mail.                                                                                                  | P0   | Après mot de passe valide, un défi OTP est créé et envoyé à l'adresse vérifiée ; aucun jeton de session complet n'est émis avant validation de l'OTP. Le téléphone n'est pas accepté comme identifiant. Échec du mot de passe : message uniforme.                      |
-| IAM-F-05 | Jeton d'accès court (JWT signé asymétriquement) et jeton de rafraîchissement opaque, rotatif, stocké haché.                                                    | P0   | Un refresh token ne peut servir qu'une fois ; sa réutilisation révoque la famille de sessions.                                                                                                                                                                         |
-| IAM-F-06 | Publication des clés publiques de vérification (JWKS) avec identifiant de clé (`kid`) et rotation.                                                             | P0   | Un service tiers vérifie un jeton sans appeler `auth-service` ; une clé tournée reste valide pendant la période de chevauchement.                                                                                                                                      |
+| IAM-F-05 | Jeton d'accès court signé en HS256 avec un secret partagé runtime et jeton de rafraîchissement opaque, rotatif, stocké haché.                                      | P0   | Le secret HS256 est distinct des clés HMAC OTP/IP, reste runtime-only et n'est jamais publié par une API. Un refresh token ne peut servir qu'une fois ; sa réutilisation révoque la famille de sessions.                                                                  |
+| IAM-F-06 | Vérification locale des JWT par secret HS256 partagé et rotation avec chevauchement des secrets.                                                               | P0   | Les services consommateurs valident les jetons sans appeler `auth-service`, avec le secret courant et, pendant une rotation, les anciens secrets configurés. Aucun JWKS ni `kid` n'est publié ou requis.                                                               |
 | IAM-F-07 | Politique de mot de passe : longueur minimale, refus des mots de passe courants, hachage argon2id.                                                             | P0   | Un mot de passe trop court ou de la liste de mots courants est refusé ; aucun mot de passe n'apparaît en clair en base ni dans les journaux.                                                                                                                           |
 | IAM-F-08 | Verrouillage progressif après échecs répétés, par identité et par IP.                                                                                          | P0   | Après N échecs consécutifs, la connexion est refusée jusqu'à `lockedUntil`, même avec le bon mot de passe ; la durée augmente à chaque verrouillage successif.                                                                                                         |
 | IAM-F-09 | Récupération de compte (mot de passe oublié) par OTP e-mail ou lien à usage unique ; changement de mot de passe.                                               | P0   | Le code/lien est à usage unique, borné dans le temps et limité en essais ; après réinitialisation ou changement, toutes les autres sessions sont révoquées.                                                                                                            |
@@ -253,7 +253,7 @@ Le verrouillage temporaire n'est **pas** un état : il est dérivé de `lockedUn
 | Service                   | `auth-service`, NestJS avec Express, TypeScript strict. [DÉCISION]                                                                                                                           |
 | Base de données           | PostgreSQL dédiée à `auth-service`, Prisma, schéma propre au service. [DÉCISION]                                                                                                             |
 | Hachage                   | argon2id pour les mots de passe ; SHA-256 pour les refresh tokens ; HMAC-SHA-256 avec sel aléatoire et clé runtime dédiée pour les OTP.                                                     |
-| Signature des jetons      | Asymétrique (EdDSA ou RS256), clé privée uniquement dans `auth-service`, publication JWKS.                                                                                                   |
+| Signature des jetons      | HS256 avec secret aléatoire partagé entre `auth-service` et les services vérificateurs ; secret distinct de `OTP_HASH_KEY` et `IP_HASH_KEY`, fourni uniquement au runtime.                                     |
 | Limitation de débit       | En mémoire par instance en V1 ; Redis introduit quand `auth-service` passe en multi-instance.                                                                                                |
 | Événements                | Transactional Outbox ; en l'absence de broker, le relay local journalise les identifiants/noms d'événement sans payload et conserve les messages en outbox. Le broker reste à confirmer (ADR-001 D7). |
 | Envoi d'OTP               | SMTP générique configurable, Maildev en développement ; aucun code n'est journalisé. Le fournisseur SMTP de production reste ouvert.                                                       |
@@ -288,6 +288,10 @@ Le verrouillage temporaire n'est **pas** un état : il est dérivé de `lockedUn
 
 **Permissions** : le catalogue rôle → permissions est un artefact versionné de `@kgpay/contracts`. Chaque cœur y déclare ses permissions au fur et à mesure de son développement ; `pv` permet de détecter un jeton émis avant un changement de catalogue.
 
+**Vérification et rotation [DÉCISION]** : les services consommateurs vérifient HS256 localement avec le secret runtime partagé. `JWT_SIGNING_SECRET` signe les nouveaux jetons ; `JWT_SIGNING_PREVIOUS_SECRETS_JSON` accepte temporairement les secrets précédents pendant une rotation. L'ancienne valeur reste dans cette liste jusqu'à expiration des jetons concernés, puis peut en être retirée. Aucune clé HMAC ne doit être publiée dans un endpoint JWKS. Comme un service vérificateur qui détient le secret peut aussi fabriquer des JWT, l'accès à ce secret doit être limité aux services de confiance et traité comme un secret de signature.
+
+La migration depuis l'ancienne proposition RS256 invalide les access tokens et preuves de step-up déjà signés en RS256. Les sessions persistées ne sont pas supprimées ; les clients renouvellent leur access token avec le refresh token, et répètent un step-up si nécessaire.
+
 Format des permissions : `domaine.ressource.action`. Exemples du cœur 1 : `iam.identity.read`, `iam.identity.create`, `iam.identity.suspend`, `iam.identity.disable`, `iam.role.assign`, `iam.session.revoke`, `iam.access-event.read`, `iam.access-review.read`.
 
 ### 8.3 Événements
@@ -318,7 +322,7 @@ Les chemins ci-dessous donnent la forme attendue ; les contrats finaux seront fi
 | Sessions personnelles       | `GET /auth/sessions`, `DELETE /auth/sessions/{id}`                                                                                                                                                                                   |
 | Invitation                  | `POST /auth/invitations/accept`, `POST /admin/identities/{id}/invitation/resend`                                                                                                                                                    |
 | Administration              | `POST /admin/identities`, `GET /admin/identities`, `POST /admin/identities/{id}/suspend`, `.../reactivate`, `.../disable`, `.../unlock`, `POST /admin/identities/{id}/roles`, `GET /admin/access-events`, `GET /admin/access-review` |
-| Clés et interne             | `GET /.well-known/jwks.json`, `POST /internal/introspect`                                                                                                                                                                            |
+| Interne                     | `POST /internal/introspect`                                                                                                                                                                                                         |
 
 ### 8.5 Paramètres configurables et valeurs par défaut proposées
 
@@ -359,7 +363,7 @@ Chaque cœur ajoute ses actions sensibles à la liste au fil de son CDC, avec la
 - Message d'erreur d'authentification uniforme ; temps de réponse non discriminant (pas d'énumération de comptes).
 - Aucun secret, mot de passe, OTP, refresh token ni jeton complet dans les journaux, les événements ou les messages d'erreur.
 - Les OTP de vérification du contact, de MFA de connexion et de récupération de mot de passe sont à usage et finalité distincts, à durée limitée, à usage unique et stockés sous forme hachée.
-- La clé privée de signature n'est jamais exposée ni versionnée.
+- Le secret de signature partagé n'est jamais exposé par une API, versionné, inclus dans un build ou écrit dans les journaux.
 - Contrôle de l'origine (CORS restreint), en-têtes de sécurité, TLS obligatoire en production.
 - Identifiant de corrélation propagé dans toutes les réponses et tous les journaux.
 - Protection contre le rejeu des OTP et des preuves de step-up.
@@ -376,8 +380,8 @@ Journaux structurés (JSON) avec `correlationId`. Métriques minimales : connexi
 | Unitaire    | Politique de mot de passe, calcul du verrouillage, rotation de refresh, génération et validation des jetons, règles de compatibilité des rôles.                   |
 | Intégration | Persistance Prisma, outbox (publication après commit, reprise après panne), invitation, OTP.                                                                      |
 | E2E         | Parcours §4.1 à §4.5 complets.                                                                                                                                    |
-| Sécurité    | Énumération de comptes, force brute, réutilisation de refresh, jeton falsifié, mauvais `kid`, step-up expiré ou détourné, auto-attribution de rôle, accès croisé. |
-| Contrat     | Les services consommateurs valident les jetons réels émis par `auth-service` via JWKS.                                                                            |
+| Sécurité    | Énumération de comptes, force brute, réutilisation de refresh, jeton falsifié, algorithme autre que HS256, step-up expiré ou détourné, auto-attribution de rôle, accès croisé. |
+| Contrat     | Les services consommateurs valident les jetons réels émis par `auth-service` avec le secret HS256 partagé, sans appel réseau.                                      |
 
 ### 8.10 Exigences frontend et contrats partagés [PROPOSITION]
 
@@ -434,7 +438,7 @@ Journaux structurés (JSON) avec `correlationId`. Métriques minimales : connexi
 - **Doublon d'inscription simultané** : une contrainte d'unicité en base tranche, une seule inscription aboutit.
 - **OTP de finalités différentes** : un code de vérification d'adresse ou de récupération de mot de passe ne peut pas satisfaire le défi MFA de connexion.
 - **Indisponibilité du broker** : l'outbox conserve les événements, l'authentification reste fonctionnelle.
-- **Indisponibilité d'`auth-service`** : les services qui vérifient localement via JWKS continuent à accepter les jetons valides ; les nouvelles connexions, refresh et step-up échouent.
+- **Indisponibilité d'`auth-service`** : les services qui vérifient localement avec leur secret HS256 runtime continuent à accepter les jetons valides ; les nouvelles connexions, refresh et step-up échouent.
 
 ## 10. Points ouverts et décisions associées
 
@@ -478,8 +482,8 @@ Le cœur 1 est recevable en V1 lorsque :
 
 1. Un client s'inscrit, vérifie son e-mail, conserve son téléphone comme contact non vérifié, puis se connecte par e-mail avec OTP ; il rafraîchit sa session et se déconnecte.
 2. Un collaborateur est invité, vérifie son adresse e-mail et se connecte avec OTP après son mot de passe ; sans OTP valide, aucune session complète n'est possible.
-3. Un autre service valide un jeton uniquement avec la clé publique JWKS, sans appel à `auth-service`.
-4. Une rotation de clé de signature n'interrompt pas les sessions en cours.
+3. Un autre service valide localement un jeton réel HS256 avec son secret runtime partagé, sans appel à `auth-service`.
+4. Une rotation avec un secret précédent configuré valide les jetons émis avant et après le changement jusqu'à expiration de la fenêtre de chevauchement.
 5. La réutilisation d'un refresh token révoque la famille de sessions.
 6. Les verrouillages progressifs fonctionnent et ne permettent pas d'énumérer les comptes.
 7. Les règles de compatibilité des rôles et l'interdiction d'auto-attribution sont testées.
@@ -520,7 +524,7 @@ Premier cœur : aucun delta. Les cœurs suivants documenteront ici les élément
 | Décision                                                                                                                                                        | Origine                          |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
 | Service `auth-service` dédié, sans gateway                                                                                                                      | [DÉCISION]                       |
-| JWT asymétrique + JWKS, refresh rotatif                                                                                                                         | [PROPOSITION]                    |
+| JWT HS256 avec secret runtime partagé, rotation par chevauchement des secrets, refresh rotatif                                                                  | [DÉCISION] porteur, 25 nov. 2026 |
 | Rôles intégrés et personnalisés limités à un catalogue fermé et versionné de permissions                                                                        | [DÉCISION] porteur, 21 nov. 2026 |
 | Connexion autorisée avant validation du dossier client                                                                                                          | [PROPOSITION]                    |
 | Quatre rôles intégrés : `CUSTOMER`, `GLOBAL_SUPER_ADMIN`, `OPERATIONS_ADMIN`, `CONFIGURATION_ADMIN` ; rôles personnalisés possibles à partir du catalogue fermé | [DÉCISION] porteur, 21 nov. 2026 |

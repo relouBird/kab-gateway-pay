@@ -308,7 +308,7 @@ Types prévus : pièce d'identité (recto, verso, ou passeport), justificatif de
 | --- | --- |
 | Service | `customer-service`, NestJS avec Express, TypeScript strict (comme `auth-service`). Créé à la validation de ce CDC (ADR-001 D9). |
 | Base | PostgreSQL dédiée, Prisma, schéma propre (ADR-001 D4). |
-| Authentification | `@kgpay/auth-guard` : vérification locale des JWT via JWKS ; permissions du §3.2 ; step-up via `@RequireStepUp('customer-decision')`. |
+| Authentification | `@kgpay/auth-guard` : vérification locale des JWT HS256 via le secret partagé runtime et les secrets précédents pendant une rotation ; permissions du §3.2 ; step-up via `@RequireStepUp('customer-decision')`. |
 | Événements | ADR-003 : outbox, livraison HTTP signée en V1, inbox idempotente. |
 | Documents | ADR-004 : port `DocumentStore`, chiffrement applicatif, lecture contrôlée, audit. |
 | Courriels | Port `Notifier` avec adaptateur SMTP ; Maildev en développement ; remplacé par le cœur 12 sans toucher au domaine [POINT OUVERT 2]. |
@@ -374,7 +374,7 @@ Journaux structurés avec `correlationId`. Métriques minimales : dossiers par �
 | --- | --- |
 | Unitaire | Machine d'états (table de transitions autorisées et interdites), contrôle de complétude, statut global dérivé, calcul d'empreinte de doublon, règles RP-15. |
 | Intégration | Persistance Prisma, inbox (rejeu), outbox, `DocumentStore` (chiffrement, versions), port `ClosureEligibility`. |
-| Contrat | `customer-service` consomme un **vrai** `IdentityRegistered` émis par `auth-service` ; ses jetons sont vérifiés via le JWKS réel. |
+| Contrat | `customer-service` consomme un **vrai** `IdentityRegistered` émis par `auth-service` ; ses jetons sont vérifiés localement avec le secret HS256 runtime partagé, sans appel à `auth-service`. |
 | Sécurité | Accès croisé (client A vers dossier ou pièce de B), pièce de type falsifié, fichier trop gros, nom de fichier piégé, décision sans step-up ou avec step-up d'une autre catégorie, lecture de pièce sans permission, injection dans les champs libres. |
 | E2E | Parcours §4.1 à §4.6 dans les deux portails (Playwright, ADR-005 F13). |
 | Recette | `docs/recette/RECETTE-02-cycle-de-vie-client.md`, à produire après validation de ce CDC avec le même gabarit que RECETTE-01. |

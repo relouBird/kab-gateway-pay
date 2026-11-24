@@ -1,17 +1,5 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import {
-  createHash,
-  createPrivateKey,
-  createPublicKey,
-  randomBytes,
-  randomUUID,
-} from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 import {
   PERMISSION_CATALOG,
@@ -40,89 +28,60 @@ export interface StepUpClaims extends JwtPayload {
   typ: 'stepup';
 }
 
-interface AdditionalPublicKey {
-  kid: string;
-  publicKeyPem: string;
-}
-
 @Injectable()
 export class TokenService {
-  private readonly signingKey;
-  private readonly keyId: string;
-  private readonly publicKeys = new Map<
-    string,
-    ReturnType<typeof createPublicKey>
-  >();
+  private readonly signingSecret: string;
+  private readonly verificationSecrets: string[];
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: AuthConfig,
   ) {
-    const privatePem = (
-      process.env.JWT_PRIVATE_KEY ??
-      (process.env.JWT_PRIVATE_KEY_FILE
-        ? readFileSync(resolve(process.env.JWT_PRIVATE_KEY_FILE), 'utf8')
-        : undefined)
-    )?.replace(/\\n/g, '\n');
-    const keyId = process.env.JWT_KEY_ID?.trim();
-    if (!privatePem || !keyId || !/^[A-Za-z0-9._-]{1,64}$/.test(keyId)) {
-      throw new Error(
-        'JWT_PRIVATE_KEY and JWT_KEY_ID are required at runtime.',
-      );
-    }
-
-    this.signingKey = createPrivateKey(privatePem);
+    const signingSecret = process.env.JWT_SIGNING_SECRET;
     if (
-      this.signingKey.asymmetricKeyType !== 'rsa' ||
-      (this.signingKey.asymmetricKeyDetails?.modulusLength ?? 0) < 2048
+      !signingSecret ||
+      signingSecret !== signingSecret.trim() ||
+      !/^[A-Za-z0-9_-]{64,}$/.test(signingSecret)
     ) {
       throw new Error(
-        'JWT_PRIVATE_KEY must be an RSA key of at least 2048 bits.',
+        'JWT_SIGNING_SECRET must be a base64url secret of at least 64 characters.',
       );
     }
-    this.keyId = keyId;
-    this.publicKeys.set(keyId, createPublicKey(this.signingKey));
+    this.signingSecret = signingSecret;
 
-    const rawAdditionalKeys = process.env.AUTH_SIGNING_PUBLIC_KEYS_JSON?.trim();
-    let additionalKeys: AdditionalPublicKey[];
+    const rawPreviousSecrets =
+      process.env.JWT_SIGNING_PREVIOUS_SECRETS_JSON?.trim();
+    let previousSecrets: unknown = [];
     try {
-      additionalKeys = rawAdditionalKeys
-        ? (JSON.parse(rawAdditionalKeys) as AdditionalPublicKey[])
+      previousSecrets = rawPreviousSecrets
+        ? JSON.parse(rawPreviousSecrets)
         : [];
     } catch {
-      throw new Error('AUTH_SIGNING_PUBLIC_KEYS_JSON must be a JSON array.');
+      throw new Error(
+        'JWT_SIGNING_PREVIOUS_SECRETS_JSON must be a JSON array.',
+      );
     }
-    if (!Array.isArray(additionalKeys)) {
-      throw new Error('AUTH_SIGNING_PUBLIC_KEYS_JSON must be a JSON array.');
+    if (!Array.isArray(previousSecrets)) {
+      throw new Error(
+        'JWT_SIGNING_PREVIOUS_SECRETS_JSON must be a JSON array.',
+      );
     }
 
-    for (const key of additionalKeys) {
+    for (const secret of previousSecrets) {
       if (
-        !key ||
-        typeof key.kid !== 'string' ||
-        typeof key.publicKeyPem !== 'string' ||
-        !/^[A-Za-z0-9._-]{1,64}$/.test(key.kid) ||
-        !key.publicKeyPem ||
-        /PRIVATE KEY/i.test(key.publicKeyPem)
+        typeof secret !== 'string' ||
+        !/^[A-Za-z0-9_-]{64,}$/.test(secret) ||
+        secret === signingSecret
       ) {
         throw new Error(
-          'Each signing public key requires a kid and publicKeyPem.',
+          'Each previous JWT signing secret must be a distinct base64url secret of at least 64 characters.',
         );
       }
-      if (this.publicKeys.has(key.kid)) {
-        throw new Error(`Duplicate JWT key id: ${key.kid}.`);
-      }
-      const publicKey = createPublicKey(key.publicKeyPem.replace(/\\n/g, '\n'));
-      if (
-        publicKey.asymmetricKeyType !== 'rsa' ||
-        (publicKey.asymmetricKeyDetails?.modulusLength ?? 0) < 2048
-      ) {
-        throw new Error(
-          'Each signing public key must be RSA with at least 2048 bits.',
-        );
-      }
-      this.publicKeys.set(key.kid, publicKey);
     }
+    if (new Set(previousSecrets).size !== previousSecrets.length) {
+      throw new Error('JWT signing secrets must be unique.');
+    }
+    this.verificationSecrets = [signingSecret, ...previousSecrets];
   }
 
   issueAccessToken(input: {
@@ -141,10 +100,9 @@ export class TokenService {
         pv: PERMISSION_CATALOG_VERSION,
         amr: ['pwd', 'otp'],
       },
-      this.signingKey,
+      this.signingSecret,
       {
-        algorithm: 'RS256',
-        keyid: this.keyId,
+        algorithm: 'HS256',
         issuer: this.config.issuer,
         audience: this.config.audience,
         subject: input.identityId,
@@ -190,10 +148,9 @@ export class TokenService {
     );
     const token = jwt.sign(
       { sid: input.sessionId, act: input.action, typ: 'stepup' },
-      this.signingKey,
+      this.signingSecret,
       {
-        algorithm: 'RS256',
-        keyid: this.keyId,
+        algorithm: 'HS256',
         issuer: this.config.issuer,
         audience: this.config.audience,
         subject: input.identityId,
@@ -229,26 +186,6 @@ export class TokenService {
     return claims as StepUpClaims;
   }
 
-  getJwks(): { keys: Record<string, string>[] } {
-    const keys = [...this.publicKeys.entries()].map(([kid, key]) => {
-      const jwk = key.export({ format: 'jwk' });
-      if (jwk.kty !== 'RSA' || !jwk.n || !jwk.e) {
-        throw new InternalServerErrorException(
-          'The configured signing key cannot be published as an RSA JWK.',
-        );
-      }
-      return {
-        kty: jwk.kty,
-        use: 'sig',
-        alg: 'RS256',
-        kid,
-        n: jwk.n,
-        e: jwk.e,
-      };
-    });
-    return { keys };
-  }
-
   hashOpaqueToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }
@@ -262,28 +199,25 @@ export class TokenService {
     if (
       !decoded ||
       typeof decoded === 'string' ||
-      typeof decoded.header.kid !== 'string' ||
-      decoded.header.alg !== 'RS256'
+      decoded.header.alg !== 'HS256'
     ) {
       throw new UnauthorizedException('Invalid token.');
     }
 
-    const key = this.publicKeys.get(decoded.header.kid);
-    if (!key) {
-      throw new UnauthorizedException('Invalid token.');
-    }
-    try {
-      const claims = jwt.verify(token, key, {
-        algorithms: ['RS256'],
-        issuer: this.config.issuer,
-        audience: this.config.audience,
-      });
-      if (typeof claims === 'string') {
-        throw new UnauthorizedException('Invalid token.');
+    for (const secret of this.verificationSecrets) {
+      try {
+        const claims = jwt.verify(token, secret, {
+          algorithms: ['HS256'],
+          issuer: this.config.issuer,
+          audience: this.config.audience,
+        });
+        if (typeof claims !== 'string') {
+          return claims;
+        }
+      } catch {
+        continue;
       }
-      return claims;
-    } catch {
-      throw new UnauthorizedException('Invalid token.');
     }
+    throw new UnauthorizedException('Invalid token.');
   }
 }

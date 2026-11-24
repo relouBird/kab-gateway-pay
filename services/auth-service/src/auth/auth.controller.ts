@@ -49,7 +49,6 @@ import { RequireStepUp } from '../common/decorators';
 import type { AuthenticatedRequest } from '../common/auth-context';
 import { getRequestMetadata } from '../common/request-context';
 import { AUTH_CONFIG, type AuthConfig } from '../config/auth.config';
-import { TokenService } from '../security/token.service';
 
 const REFRESH_COOKIE = 'kgpay_refresh';
 const CSRF_COOKIE = 'kgpay_csrf';
@@ -442,17 +441,6 @@ export class AuthController {
       sessionId,
       getRequestMetadata(request),
     );
-  }
-}
-
-@ApiTags('Keys')
-@Controller('.well-known')
-export class JwksController {
-  constructor(private readonly tokens: TokenService) {}
-
-  @Get('jwks.json')
-  jwks(): { keys: Record<string, string>[] } {
-    return this.tokens.getJwks();
   }
 }
 

@@ -14,7 +14,7 @@ import { AuditService } from '../security/audit.service';
 import { PasswordService } from '../security/password.service';
 import { TokenService } from '../security/token.service';
 import { AdminController, InternalController } from './admin.controller';
-import { AuthController, JwksController } from './auth.controller';
+import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
 import { AccessReviewScheduler } from './access-review.scheduler';
@@ -27,12 +27,7 @@ import {
 
 @Module({
   imports: [EmailOtpModule],
-  controllers: [
-    AuthController,
-    AdminController,
-    InternalController,
-    JwksController,
-  ],
+  controllers: [AuthController, AdminController, InternalController],
   providers: [
     PrismaService,
     RoleSeederService,

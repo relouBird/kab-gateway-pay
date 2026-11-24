@@ -1,5 +1,5 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { generateKeyPairSync } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { PrismaService } from '../database/prisma.service';
 import { validAuthConfig } from '../../test/helpers/auth-config';
@@ -7,26 +7,19 @@ import { TokenService } from './token.service';
 
 describe('TokenService', () => {
   const environmentKeys = [
-    'JWT_PRIVATE_KEY',
-    'JWT_KEY_ID',
-    'AUTH_SIGNING_PUBLIC_KEYS_JSON',
+    'JWT_SIGNING_SECRET',
+    'JWT_SIGNING_PREVIOUS_SECRETS_JSON',
   ] as const;
   const previousEnvironment = new Map(
     environmentKeys.map((key) => [key, process.env[key]]),
   );
   let tokens: TokenService;
-  let privateKey: string;
+  let signingSecret: string;
 
   beforeEach(() => {
-    const currentKeyPair = generateKeyPairSync('rsa', {
-      modulusLength: 2048,
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-    });
-    privateKey = currentKeyPair.privateKey;
-    process.env.JWT_PRIVATE_KEY = privateKey;
-    process.env.JWT_KEY_ID = 'current-key';
-    delete process.env.AUTH_SIGNING_PUBLIC_KEYS_JSON;
+    signingSecret = randomBytes(64).toString('base64url');
+    process.env.JWT_SIGNING_SECRET = signingSecret;
+    delete process.env.JWT_SIGNING_PREVIOUS_SECRETS_JSON;
     tokens = new TokenService(new PrismaService(), validAuthConfig());
   });
 
@@ -41,7 +34,7 @@ describe('TokenService', () => {
     }
   });
 
-  it('issues an RS256 access token with the current permission catalogue', () => {
+  it('issues an HS256 access token with the current permission catalogue', () => {
     const token = tokens.issueAccessToken({
       identityId: 'identity-id',
       sessionId: 'session-id',
@@ -59,36 +52,38 @@ describe('TokenService', () => {
       pv: 1,
       amr: ['pwd', 'otp'],
     });
-    expect(tokens.getJwks().keys).toMatchObject([
-      { kid: 'current-key', alg: 'RS256', use: 'sig' },
-    ]);
+    expect(jwt.decode(token, { complete: true })?.header).toEqual({
+      alg: 'HS256',
+      typ: 'JWT',
+    });
   });
 
-  it('accepts an empty optional previous-key configuration', () => {
-    process.env.AUTH_SIGNING_PUBLIC_KEYS_JSON = '  ';
+  it('accepts an empty optional previous-secret configuration', () => {
+    process.env.JWT_SIGNING_PREVIOUS_SECRETS_JSON = '  ';
     tokens = new TokenService(new PrismaService(), validAuthConfig());
 
-    expect(tokens.getJwks().keys.map(({ kid }) => kid)).toEqual([
-      'current-key',
-    ]);
+    const token = tokens.issueAccessToken({
+      identityId: 'identity-id',
+      sessionId: 'session-id',
+      subjectType: 'CUSTOMER',
+      roles: ['CUSTOMER'],
+      permissions: [],
+    });
+    expect(tokens.verifyAccessToken(token).sub).toBe('identity-id');
   });
 
-  it('rejects malformed non-empty previous-key configuration', () => {
-    process.env.AUTH_SIGNING_PUBLIC_KEYS_JSON = '{';
+  it('rejects malformed previous-secret configuration', () => {
+    process.env.JWT_SIGNING_PREVIOUS_SECRETS_JSON = '{';
 
     expect(
       () => new TokenService(new PrismaService(), validAuthConfig()),
-    ).toThrow('AUTH_SIGNING_PUBLIC_KEYS_JSON must be a JSON array.');
+    ).toThrow('JWT_SIGNING_PREVIOUS_SECRETS_JSON must be a JSON array.');
   });
 
-  it('verifies tokens signed by a previous public key during rotation overlap', () => {
-    const previousKeyPair = generateKeyPairSync('rsa', {
-      modulusLength: 2048,
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-    });
-    process.env.AUTH_SIGNING_PUBLIC_KEYS_JSON = JSON.stringify([
-      { kid: 'previous-key', publicKeyPem: previousKeyPair.publicKey },
+  it('verifies tokens signed by a previous secret during rotation overlap', () => {
+    const previousSecret = randomBytes(64).toString('base64url');
+    process.env.JWT_SIGNING_PREVIOUS_SECRETS_JSON = JSON.stringify([
+      previousSecret,
     ]);
     tokens = new TokenService(new PrismaService(), validAuthConfig());
     const token = jwt.sign(
@@ -100,10 +95,9 @@ describe('TokenService', () => {
         pv: 1,
         amr: ['pwd', 'otp'],
       },
-      previousKeyPair.privateKey,
+      previousSecret,
       {
-        algorithm: 'RS256',
-        keyid: 'previous-key',
+        algorithm: 'HS256',
         issuer: 'https://auth.example.test',
         audience: 'kgpay-services',
         subject: 'identity-id',
@@ -112,10 +106,59 @@ describe('TokenService', () => {
     );
 
     expect(tokens.verifyAccessToken(token).typ).toBe('STAFF');
-    expect(tokens.getJwks().keys.map(({ kid }) => kid)).toEqual([
-      'current-key',
-      'previous-key',
+  });
+
+  it('requires a long base64url current secret and rejects duplicate previous secrets', () => {
+    process.env.JWT_SIGNING_SECRET = 'short';
+    expect(
+      () => new TokenService(new PrismaService(), validAuthConfig()),
+    ).toThrow(
+      'JWT_SIGNING_SECRET must be a base64url secret of at least 64 characters.',
+    );
+
+    process.env.JWT_SIGNING_SECRET = signingSecret;
+    process.env.JWT_SIGNING_PREVIOUS_SECRETS_JSON = JSON.stringify([
+      signingSecret,
     ]);
+    expect(
+      () => new TokenService(new PrismaService(), validAuthConfig()),
+    ).toThrow(
+      'Each previous JWT signing secret must be a distinct base64url secret of at least 64 characters.',
+    );
+
+    const previousSecret = randomBytes(64).toString('base64url');
+    process.env.JWT_SIGNING_PREVIOUS_SECRETS_JSON = JSON.stringify([
+      previousSecret,
+      previousSecret,
+    ]);
+    expect(
+      () => new TokenService(new PrismaService(), validAuthConfig()),
+    ).toThrow('JWT signing secrets must be unique.');
+  });
+
+  it('rejects tokens signed with a different algorithm', () => {
+    const token = jwt.sign(
+      {
+        sid: 'session-id',
+        typ: 'STAFF',
+        roles: ['GLOBAL_SUPER_ADMIN'],
+        permissions: [],
+        pv: 1,
+        amr: ['pwd', 'otp'],
+      },
+      signingSecret,
+      {
+        algorithm: 'HS384',
+        issuer: 'https://auth.example.test',
+        audience: 'kgpay-services',
+        subject: 'identity-id',
+        expiresIn: '5m',
+      },
+    );
+
+    expect(() => tokens.verifyAccessToken(token)).toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('rejects a correctly signed token containing a permission outside the catalogue', () => {
@@ -128,10 +171,9 @@ describe('TokenService', () => {
         pv: 1,
         amr: ['pwd', 'otp'],
       },
-      privateKey,
+      signingSecret,
       {
-        algorithm: 'RS256',
-        keyid: 'current-key',
+        algorithm: 'HS256',
         issuer: 'https://auth.example.test',
         audience: 'kgpay-services',
         subject: 'identity-id',

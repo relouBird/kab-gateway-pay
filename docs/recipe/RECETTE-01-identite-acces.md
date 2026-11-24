@@ -124,7 +124,7 @@ Ordre recommandé : 0xx → 1xx et 2xx (parallèles) → 3xx → 4xx → 5xx →
 | RC1-003 | P0 | M/A | Inspecter `.generated/env/auth-service.build.env` et `.runtime.env`. | Le fichier de build **ne contient aucune clé** déclarée `runtimeOnlyKeys` (clés privées, secrets SMTP, mots de passe de base) ; le fichier runtime contient les clés nécessaires uniquement ; les deux sont ignorés par Git. | ADR-001 §5 ; CDC-01 §11.12 |
 | RC1-004 | P0 | M/A | Démarrer `auth-service` puis appeler `GET /health` **sans authentification**. | Réponse de santé positive. | CDC-01 §8.8 |
 | RC1-005 | P0 | M/A | Retirer une variable requise (ou fournir une valeur invalide) et démarrer. | Le service **refuse de démarrer** avec un message d'erreur de configuration sans valeur secrète. Restaurer ensuite. | CDC-01 §11.12 |
-| RC1-006 | P0 | M/A | Appeler `GET /.well-known/jwks.json`. | Au moins une clé publique avec `kid` ; aucune clé privée. | IAM-F-06 |
+| RC1-006 | P0 | M/A | Après connexion, inspecter l'en-tête du JWT et les réponses HTTP. | `alg` vaut `HS256`, aucun `kid` n'est requis, et aucune réponse ne divulgue le secret de signature. | IAM-F-05, IAM-F-06 |
 | RC1-007 | P1 | M/A | Appeler `GET /docs-json` et ouvrir `/docs` en profil développement ; les rappeler en profil production. | Disponibles en développement ; **désactivés** en production. | ADR-002 §10 |
 | RC1-008 | P0 | M | Ouvrir chaque portail à son adresse. | Les deux pages d'accueil de connexion s'affichent sans erreur console bloquante. | IAM-F-22 |
 | RC1-009 | P0 | M/A | Depuis chaque origine de portail, émettre une requête préliminaire CORS vers `auth-service` ; répéter depuis une origine non déclarée. | Origines déclarées acceptées ; origine inconnue refusée. | CDC-01 §8.7 ; ADR-002 §11 |
@@ -184,7 +184,7 @@ Portail : `staff-portal`. Le compte `GLOBAL_SUPER_ADMIN` est celui créé en RC1
 | ID | Prio | Mode | Scénario | Résultat attendu | Couvre |
 | --- | --- | --- | --- | --- | --- |
 | RC1-301 | P0 | A | Mesurer réponse et délai pour : e-mail connu/inconnu en connexion, inscription, mot de passe oublié. | Aucune différence exploitable (message, code HTTP, ordre de grandeur du délai). | IAM-R-02 |
-| RC1-302 | P0 | A | Présenter un jeton falsifié, signé avec un autre `kid`, avec `alg: none`, ou modifié après signature. | **Tous refusés**. | CDC-01 §8.9 |
+| RC1-302 | P0 | A | Présenter un jeton falsifié, signé avec un algorithme autre que HS256 (`HS384` ou `none`), ou modifié après signature. | **Tous refusés**. | CDC-01 §8.9 |
 | RC1-303 | P0 | M/A | Après l'exécution complète de la recette, rechercher dans les journaux d'`auth-service`, de Maildev (hors corps des courriels de test) et du navigateur : mots de passe, codes OTP, refresh tokens, jetons complets. | **Aucune occurrence**. Le relay d'outbox ne journalise ni payload ni secret. | CDC-01 §8.7, §11.11 |
 | RC1-304 | P0 | M/A | Inspecter les lignes d'outbox : contenu des payloads. | Pas de secret ; données personnelles limitées au contrat de l'événement. | IAM-R-10 |
 | RC1-305 | P1 | A | Examiner les en-têtes de réponse (sécurité, CORS, cache) sur les routes d'authentification. | En-têtes de sécurité présents ; CORS restreint ; pas de mise en cache des réponses d'authentification. | CDC-01 §8.7 |
@@ -194,9 +194,9 @@ Portail : `staff-portal`. Le compte `GLOBAL_SUPER_ADMIN` est celui créé en RC1
 
 | ID | Prio | Mode | Scénario | Résultat attendu | Couvre |
 | --- | --- | --- | --- | --- | --- |
-| RC1-401 | P0 | A | Un script externe (spécification : `scripts/recette/verify-jwks`, à créer) récupère le JWKS une fois puis vérifie un jeton réel **sans appeler** `auth-service`. | Signature, `iss`, `aud`, `exp` validés localement ; le même contrôle sert de test de contrat pour `@kgpay/auth-guard`. | IAM-F-06, CDC-01 §11.3 |
-| RC1-402 | P0 | M/A | Déclencher la rotation de clé (profil de recette). Vérifier un jeton émis **avant** et un jeton émis **après**. | Les deux sont valides pendant le chevauchement ; le JWKS liste les deux `kid` ; passé le chevauchement, l'ancienne clé disparaît ; les sessions en cours ne sont pas interrompues. | IAM-F-06, CDC-01 §11.4 |
-| RC1-403 | P0 | M/A | Arrêter `auth-service` ; vérifier un jeton déjà émis avec le script de RC1-401 ; tenter une connexion depuis le portail. | Le jeton reste vérifiable (clés en cache) ; la connexion échoue proprement avec un état d'erreur lisible, sans perte de saisie ni boucle de requêtes. | CDC-01 §9 |
+| RC1-401 | P0 | A | Un script externe (spécification : `scripts/recette/verify-shared-secret`, à créer) vérifie un jeton réel **sans appeler** `auth-service`, avec le secret runtime configuré pour le service consommateur. | Signature HS256, `iss`, `aud`, `exp` validés localement ; le même contrôle sert de test de contrat pour `@kgpay/auth-guard`. | IAM-F-06, CDC-01 §11.3 |
+| RC1-402 | P0 | M/A | Déclencher une rotation en configurant l'ancien secret dans `JWT_SIGNING_PREVIOUS_SECRETS_JSON`. Vérifier un jeton émis **avant** et un jeton émis **après**. | Les deux sont valides pendant le chevauchement ; après expiration des jetons signés avec l'ancien secret, celui-ci peut être retiré sans interrompre les sessions. | IAM-F-06, CDC-01 §11.4 |
+| RC1-403 | P0 | M/A | Arrêter `auth-service` ; vérifier un jeton déjà émis avec le secret local du service consommateur ; tenter une connexion depuis le portail. | Le jeton reste vérifiable localement ; la connexion échoue proprement avec un état d'erreur lisible, sans perte de saisie ni boucle de requêtes. | CDC-01 §9 |
 
 ### 7.3 Événements et outbox (RC1-5xx)
 
@@ -230,7 +230,7 @@ Portail : `staff-portal`. Le compte `GLOBAL_SUPER_ADMIN` est celui créé en RC1
 | ID | Prio | Mode | Scénario | Résultat attendu | Couvre |
 | --- | --- | --- | --- | --- | --- |
 | RC1-701 | P0 | M/A | Recréer une base vide et rejouer toutes les migrations ; les rejouer une seconde fois. | Succès ; seconde exécution sans effet ; données de seed (rôles, catalogue) présentes. | CDC-01 §8.1 |
-| RC1-702 | P1 | A | Comparer la collection Postman (38 opérations au 23 novembre) au document `/docs-json`. | Aucune opération manquante ni obsolète ; sinon synchroniser (ADR-002 §10). | ADR-002 §10 |
+| RC1-702 | P1 | A | Comparer la collection Postman (37 opérations depuis le 25 novembre) au document `/docs-json`. | Aucune opération manquante ni obsolète ; sinon synchroniser (ADR-002 §10). | ADR-002 §10 |
 | RC1-703 | P1 | A | Exécuter la collection avec un exécuteur en ligne de commande contre l'environnement de recette. | Aucun échec sur les opérations valides ; les cas d'erreur renvoient les codes attendus. | ADR-002 §10 |
 | RC1-704 | P0 | M/A | Lancer les tests unitaires, le lint, le typecheck et le build de `auth-service`, `customer-portal`, `staff-portal`, `@kgpay/contracts`. | Tout passe ; la règle de dépendance entre packages et services est respectée. | ADR-001 §4 |
 | RC1-705 | P1 | M | Rejouer RC1-107 derrière HTTPS (certificat local de confiance ou hébergement de recette). | Cookie de refresh `Secure` et `HttpOnly` ; `SameSite` conforme à la décision finale ; Service Worker installable. | CDC-01 §10 point 10 ; ADR-002 §13 |

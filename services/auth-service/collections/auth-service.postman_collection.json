@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "KG Pay — auth-service",
-    "description": "Collection générée depuis le contrat OpenAPI exposé par auth-service.\n\nInventaire : 38 opérations.\n\nDécouverte complète et schémas détaillés : GET {{baseUrl}}/docs-json ; interface interactive : {{baseUrl}}/docs (hors production).\n\nParcours CUSTOMER : renseigner email/password/phone, appeler register, relever le code dans Maildev, renseigner otpCode puis verify-contact ; login et OTP ; mfa/verify enregistre accessToken et sessionId automatiquement.\n\nPour refresh/logout par cookie, utiliser le cookie jar Postman et appeler GET /auth/csrf ; la variable csrfToken est enregistrée automatiquement. Après un refresh, rappeler GET /auth/csrf avant logout.\n\nPour une opération protégée par step-up, appeler POST /auth/step-up avec stepUpAction, relever l’OTP par e-mail, puis compléter challengeId/code dans la requête step-up afin que la réponse enregistre stepUpProof.\n\nLes variables contenant des identifiants, mots de passe, codes, preuves ou tokens sont vides par défaut. Ne pas partager les valeurs locales et ne pas utiliser de vrais secrets dans la collection.\n\nLes valeurs de réponse sensibles sont enregistrées dans l’environnement Postman actif ; sélectionner un environnement local non partagé avant les requêtes.",
+    "description": "Collection générée depuis le contrat OpenAPI exposé par auth-service.\n\nInventaire : 37 opérations (sans endpoint JWKS, décision HS256 du 25 novembre 2026).\n\nDécouverte complète et schémas détaillés : GET {{baseUrl}}/docs-json ; interface interactive : {{baseUrl}}/docs (hors production).\n\nParcours CUSTOMER : renseigner email/password/phone, appeler register, relever le code dans Maildev, renseigner otpCode puis verify-contact ; login et OTP ; mfa/verify enregistre accessToken et sessionId automatiquement.\n\nPour refresh/logout par cookie, utiliser le cookie jar Postman et appeler GET /auth/csrf ; la variable csrfToken est enregistrée automatiquement. Après un refresh, rappeler GET /auth/csrf avant logout.\n\nPour une opération protégée par step-up, appeler POST /auth/step-up avec stepUpAction, relever l’OTP par e-mail, puis compléter challengeId/code dans la requête step-up afin que la réponse enregistre stepUpProof.\n\nLes variables contenant des identifiants, mots de passe, codes, preuves ou tokens sont vides par défaut. Ne pas partager les valeurs locales et ne pas utiliser de vrais secrets dans la collection.\n\nLes valeurs de réponse sensibles sont enregistrées dans l’environnement Postman actif ; sélectionner un environnement local non partagé avant les requêtes.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1828,41 +1828,6 @@
                   "language": "json"
                 }
               }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const contentType = pm.response.headers.get('Content-Type') || '';",
-                  "if (contentType.includes('application/json')) {",
-                  "  const data = pm.response.json();",
-                  "  for (const key of ['challengeId', 'accessToken', 'sessionId', 'proof', 'csrfToken']) {",
-                  "    if (typeof data[key] === 'string') pm.environment.set(key, data[key]);",
-                  "  }",
-                  "}"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "JWKS",
-      "item": [
-        {
-          "name": "GET /.well-known/jwks.json",
-          "description": "OpenAPI operationId: JwksController_jwks",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/.well-known/jwks.json",
-              "query": []
             }
           },
           "response": [],

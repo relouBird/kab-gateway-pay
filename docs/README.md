@@ -59,7 +59,7 @@ Détails et justifications : `docs/architecture/ADR-001-monorepo-microservices.m
 - **Monorepo pnpm workspaces + Turborepo** (outillage validé au bootstrap), **microservices NestJS autonomes**, **aucune API Gateway applicative**.
 - **Une base par service.** Aucun accès à la base d'un autre service. Un schéma Prisma par service, aucun package Prisma partagé.
 - **Communication** : événements asynchrones avec Transactional Outbox ; appels HTTP inter-services seulement s'ils sont justifiés dans un CDC.
-- **Authentification** : `auth-service` émet des JWT asymétriques ; les autres services les vérifient localement via JWKS avec `@kgpay/auth-guard`.
+- **Authentification** : `auth-service` émet des JWT HS256 ; les services de confiance les vérifient localement avec le secret partagé runtime via `@kgpay/auth-guard`. Ce secret permet aussi de fabriquer des JWT et n'est jamais publié comme JWKS.
 - **Packages partagés** (`packages/`) : strictement techniques (`config`, `contracts`, `common`, `auth-guard`, `testing`). `@kgpay/contracts` partage les schémas Yup/types de transport frontend/backend conformément à ADR-002 D3 ; jamais de modèle de persistance ni de décision métier côté interface.
 - **Frontend** : interfaces cadrées cœur par cœur dans les CDC correspondants ; voir [ADR-002](./architecture/ADR-002-applications-frontend-et-routage-mutualise.md) pour les propositions d'organisation, de contrats partagés et de routage.
 - `apps/customer-portal` couvre les parcours client du CDC-01 : inscription, OTP e-mail, connexion, récupération/changement de mot de passe, changement d'e-mail/téléphone avec step-up et sessions.
@@ -167,7 +167,6 @@ pnpm lint:staff-portal
 pnpm typecheck:staff-portal
 pnpm test:staff-portal
 pnpm start:auth-service
-pnpm auth:keygen
 pnpm db:auth-service:generate
 pnpm db:auth-service:migrate:dev
 pnpm db:auth-service:migrate:deploy
@@ -177,7 +176,7 @@ Les commandes racine fournissent les alias ciblés par workspace, par exemple `b
 
 Pour `auth-service`, fournir une configuration locale puis démarrer avec `pnpm start:auth-service`. Le générateur ciblé est également exécuté automatiquement par les commandes de démarrage et de migration. La commande `pnpm db:auth-service:migrate:deploy -- --env-file .env.test` sélectionne explicitement un profil pour une migration locale ; sans option, elle utilise toujours `.env`.
 
-Les workflows PlanetHoster et leur configuration sont décrits dans le [README développeur](../README.md#builds-et-déploiements-planethoster) et l'ADR-002. GitHub reconstruit temporairement `.env` depuis le secret `KG_PAY_APP_ENV`, construit les workspaces et génère les environnements runtime depuis ce même profil; le `.env` source est ensuite supprimé. Seul le fichier runtime filtré dont `auth-service` a besoin est transféré séparément vers son APP_ROOT privé, jamais dans l'archive GitHub. Le clone source reste dans `SERVER_DEPLOY_ROOT/repository/` pour les opérations manuelles et ne reçoit aucun `.env`. Les migrations de production sont manuelles et distinctes du déploiement ; suivre la [procédure dédiée](./deployment/planethoster-manual-migrations.md).
+Les workflows PlanetHoster et leur configuration sont décrits dans le [README développeur](../README.md#builds-et-déploiements-planethoster) et l'ADR-002. GitHub reconstruit temporairement `.env` depuis le secret `KG_PAY_APP_ENV`, construit les workspaces et génère les environnements runtime depuis ce même profil; le `.env` source est ensuite supprimé. Seul le fichier runtime filtré dont `auth-service` a besoin est transféré séparément vers son APP_ROOT privé, jamais dans l'archive GitHub. Le secret HS256 est fourni dans `JWT_SIGNING_SECRET__AUTH_SERVICE`; aucune clé RSA ni fichier de clé distinct n'est créé sur PH. Le clone source reste dans `SERVER_DEPLOY_ROOT/repository/` pour les opérations manuelles et ne reçoit aucun `.env`. Les migrations de production sont manuelles et distinctes du déploiement ; suivre la [procédure dédiée](./deployment/planethoster-manual-migrations.md).
 
 En développement/test, `/docs` expose Swagger UI et `/docs-json` le contrat OpenAPI exploitable par un outil ou un agent. Une collection Postman couvrant les opérations documentées est disponible dans [`services/auth-service/collections/auth-service.postman_collection.json`](../services/auth-service/collections/auth-service.postman_collection.json).
 

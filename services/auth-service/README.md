@@ -9,7 +9,7 @@ Service du cœur 1 — Identité et contrôle des accès (`CDC-01`). Cette tranc
 - Récupération du mot de passe par OTP e-mail ; changement de mot de passe et d'adresse e-mail.
 - Sessions rotatives, révocables, limitées par sujet ; verrouillage par identité/IP et contrôle d'activité `STAFF`.
 - Rôles `CUSTOMER`, `GLOBAL_SUPER_ADMIN`, `OPERATIONS_ADMIN`, `CONFIGURATION_ADMIN`, rôles personnalisés, attribution et retrait protégés.
-- Step-up e-mail à usage unique, journal d'accès append-only, événements Transactional Outbox, introspection interne, revue/désactivation des comptes inactifs et JWKS.
+- Step-up e-mail à usage unique, journal d'accès append-only, événements Transactional Outbox, introspection interne, revue/désactivation des comptes inactifs et JWT HS256.
 
 Les permissions métier des rôles `OPERATIONS_ADMIN` et `CONFIGURATION_ADMIN` seront ajoutées par les CDC propriétaires. Aucun rôle personnalisé ne peut recevoir une permission inconnue ou réservée à l'administration globale. `GLOBAL_SUPER_ADMIN` détient toutes les permissions présentes dans le catalogue versionné.
 
@@ -46,13 +46,20 @@ Le `.env` racine ignoré par Git est l'unique fichier de configuration à modifi
 - Les paramètres `SMTP_*__AUTH_SERVICE` si Maildev n'écoute pas à l'adresse/au port par défaut du modèle.
 - `STAFF_PORTAL_URL__AUTH_SERVICE` est optionnelle : si elle est renseignée, l'e-mail d'invitation inclut un lien vers `/accept-invitation`; sinon, l'e-mail conserve le jeton et le formulaire reste accessible manuellement.
 
-Générer les clés locales :
+Générer des secrets aléatoires distincts pour la signature JWT et le hachage OTP :
 
 ```powershell
-pnpm auth:keygen
+node -p "require('node:crypto').randomBytes(64).toString('base64url')"
+node -p "require('node:crypto').randomBytes(32).toString('hex')"
 ```
 
-La commande crée une paire RSA et deux clés HMAC dans `services/auth-service/.local-secrets/` et n'affiche pas le contenu des secrets. Reporter dans le `.env` racine les valeurs indiquées par la commande (`JWT_PRIVATE_KEY_FILE__AUTH_SERVICE`, `JWT_KEY_ID__AUTH_SERVICE`, `OTP_HASH_KEY__AUTH_SERVICE` et, en local si souhaité, `IP_HASH_KEY__AUTH_SERVICE`). Ne jamais committer le `.env`, les clés ou les sorties runtime.
+La première commande produit un secret HS256 de 64 octets encodé en base64url (86 caractères). La seconde produit une valeur distincte pour `OTP_HASH_KEY__AUTH_SERVICE`. Reporter chaque valeur dans le `.env` racine sans la committer; si `IP_HASH_KEY__AUTH_SERVICE` est utilisé, générer encore une valeur distincte. Ces commandes n'écrivent aucun fichier.
+
+### Secret de signature de production sur PlanetHoster
+
+Dans `.env.prod`, renseigner une fois `JWT_SIGNING_SECRET__AUTH_SERVICE` avec le résultat de la première commande ci-dessus, puis mettre à jour le secret GitHub `KG_PAY_APP_ENV`. Supprimer du profil les anciennes variables `JWT_PRIVATE_KEY_FILE__AUTH_SERVICE`, `JWT_KEY_ID__AUTH_SERVICE` et `AUTH_SIGNING_PUBLIC_KEYS_JSON__AUTH_SERVICE`. `JWT_SIGNING_PREVIOUS_SECRETS_JSON__AUTH_SERVICE` reste vide en fonctionnement normal. Aucun chemin d'APP_ROOT, identifiant `kid`, fichier RSA ou provisioning sur PH n'est nécessaire.
+
+Le workflow génère le runtime filtré depuis `KG_PAY_APP_ENV` et le transfère vers l'APP_ROOT privé d'`auth-service`. Le secret est inclus uniquement dans ce fichier runtime protégé, jamais dans l'archive de build ni les variables publiques Vite. Tout futur service vérifiant ces JWT devra recevoir le même secret; il pourra donc aussi signer des jetons. Les JWT RS256 actuellement en circulation ne seront pas acceptés après la migration; les clients devront rafraîchir leur access token et refaire un step-up si une preuve RS256 reste active. Pour une rotation, définir le nouveau `JWT_SIGNING_SECRET__AUTH_SERVICE` et placer l'ancien secret dans `JWT_SIGNING_PREVIOUS_SECRETS_JSON__AUTH_SERVICE` (tableau JSON), puis retirer l'ancien après expiration des jetons qu'il a signés. Les secrets précédents doivent être fournis aux services vérificateurs pendant le chevauchement.
 
 ### Emplacement et cycle de vie des fichiers générés
 
@@ -62,7 +69,7 @@ Le générateur lit `.env` à la racine et filtre les variables avec `services/a
 - `.generated/env/auth-service.runtime.env` : variables du processus `auth-service`, dont `DATABASE_URL` et les secrets nécessaires au service. `start`, `start:dev`, `start:prod`, la CLI d'initialisation et les commandes de migration le génèrent ou le chargent automatiquement.
 - Les deux fichiers sont générés sous `.generated/env/` à la racine, ignorés par Git et remplaçables à tout moment. Les autres workspaces produiront des fichiers avec leur propre nom, par exemple `.generated/env/customer-portal.build.env`.
 
-En production sur PlanetHoster, le workflow reconstruit temporairement le profil `.env.prod` depuis le secret GitHub `KG_PAY_APP_ENV`, puis génère le runtime filtré pour `auth-service` avec les noms non suffixés attendus par l'application. Ce fichier est transféré séparément de l'archive vers `"$SERVER_AUTH_SERVICE_APP_ROOT/.generated/env/auth-service.runtime.env"`; le `.env` source n'est jamais copié sur PH ni inclus dans un artefact. Configurer `KG_PAY_RUNTIME_ENV_FILE` dans l'application Node CloudLinux avec le chemin absolu du fichier généré. `JWT_PRIVATE_KEY_FILE__AUTH_SERVICE` doit référencer par chemin absolu une clé privée stockée hors de `runtime/`. Le clone source reste sous `SERVER_DEPLOY_ROOT/repository/` pour les opérations manuelles; seul `runtime/` est remplacé lors d'une release.
+En production sur PlanetHoster, le workflow reconstruit temporairement le profil `.env.prod` depuis le secret GitHub `KG_PAY_APP_ENV`, puis génère le runtime filtré pour `auth-service` avec les noms non suffixés attendus par l'application. Ce fichier est transféré séparément de l'archive vers `"$SERVER_AUTH_SERVICE_APP_ROOT/.generated/env/auth-service.runtime.env"`; le `.env` source n'est jamais copié sur PH ni inclus dans un artefact. Configurer `KG_PAY_RUNTIME_ENV_FILE` dans l'application Node CloudLinux avec le chemin absolu du fichier généré. Aucun fichier de clé séparé n'est créé. Le clone source reste sous `SERVER_DEPLOY_ROOT/repository/` pour les opérations manuelles; seul `runtime/` est remplacé lors d'une release.
 
 Commandes de génération explicite :
 
@@ -97,9 +104,9 @@ Swagger conserve les cookies nécessaires au même hôte mais ne persiste pas le
 
 ## Contrat API et collection Postman
 
-`GET /docs-json` est le document OpenAPI 3.0 généré depuis les contrôleurs et DTO ; il répertorie les 38 opérations HTTP de l'API et leurs schémas. Il permet à Swagger UI, Postman et aux agents de découvrir les routes sans parcourir le code. Swagger et le JSON OpenAPI sont désactivés en production.
+`GET /docs-json` est le document OpenAPI 3.0 généré depuis les contrôleurs et DTO ; il répertorie les 37 opérations HTTP de l'API et leurs schémas. Il permet à Swagger UI, Postman et aux agents de découvrir les routes sans parcourir le code. Swagger et le JSON OpenAPI sont désactivés en production.
 
-La collection [auth-service.postman_collection.json](./collections/auth-service.postman_collection.json) reprend ces 38 opérations et leurs corps requis. Importer le fichier dans Postman, créer/sélectionner un environnement local non partagé, définir `baseUrl` et y renseigner les variables de test. Les OTP doivent être lus dans Maildev et saisis dans `otpCode` ; après une réponse, les valeurs `challengeId`, `accessToken`, `sessionId`, `proof` et `csrfToken` sont enregistrées dans l'environnement actif lorsqu'elles sont présentes. Le cookie jar Postman conserve les cookies refresh/CSRF ; appeler `GET /auth/csrf` avant les opérations refresh/logout et après chaque rotation.
+La collection [auth-service.postman_collection.json](./collections/auth-service.postman_collection.json) reprend ces 37 opérations et leurs corps requis. Importer le fichier dans Postman, créer/sélectionner un environnement local non partagé, définir `baseUrl` et y renseigner les variables de test. Les OTP doivent être lus dans Maildev et saisis dans `otpCode` ; après une réponse, les valeurs `challengeId`, `accessToken`, `sessionId`, `proof` et `csrfToken` sont enregistrées dans l'environnement actif lorsqu'elles sont présentes. Le cookie jar Postman conserve les cookies refresh/CSRF ; appeler `GET /auth/csrf` avant les opérations refresh/logout et après chaque rotation.
 
 Ne pas enregistrer de vrais mots de passe, OTP, preuves, jetons ou credentials de service dans la collection partagée. Les identifiants doivent être configurés comme variables locales Postman.
 

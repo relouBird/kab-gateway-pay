@@ -379,12 +379,17 @@ jobs:
           runtime_dir="$auth_app_root/runtime"
           runtime_stage="$auth_app_root/.runtime-next-$archive_name"
           runtime_previous="$auth_app_root/.runtime-previous-$archive_name"
+          clone_tmp=""
+          clone_tmp_owned=0
           runtime_previous_moved=0
           runtime_env_stage_owned=0
           runtime_env_next_owned=0
           runtime_stage_owned=0
 
           cleanup_runtime() {
+            if [ "$clone_tmp_owned" -eq 1 ] && [ -n "$clone_tmp" ] && [ -d "$clone_tmp" ]; then
+              rm -rf -- "$clone_tmp"
+            fi
             if [ -e "$runtime_env_upload" ]; then
               rm -f -- "$runtime_env_upload"
             fi
@@ -471,6 +476,10 @@ jobs:
             echo "ERROR: Uploaded auth-service runtime environment is not configured for production."
             exit 1
           }
+          if ! grep -Eq '^JWT_SIGNING_SECRET=[A-Za-z0-9_-]{64,}$' "$staged_runtime_env"; then
+            echo "ERROR: JWT_SIGNING_SECRET is missing or invalid in the production runtime environment."
+            exit 1
+          fi
 
           if [ "$mode" = "initialize" ]; then
             # Le clone distant vérifie la révision main; le build vient de l'archive GitHub.
@@ -488,7 +497,7 @@ jobs:
               echo "ERROR: A previous repository initialization is incomplete: $clone_tmp"
               exit 1
             fi
-            trap 'rm -rf -- "$clone_tmp"' EXIT
+            clone_tmp_owned=1
             git clone --depth=1 --branch main \
               "https://github.com/$repository.git" "$clone_tmp"
             cloned_commit="$(git -C "$clone_tmp" rev-parse origin/main)"
@@ -498,7 +507,7 @@ jobs:
             fi
             git -C "$clone_tmp" reset --hard "$expected_commit"
             mv "$clone_tmp" "$repository_dir"
-            trap - EXIT
+            clone_tmp_owned=0
           elif [ "$mode" = "deploy" ]; then
             # Les redéploiements exigent un clone initialisé et une archive toujours égale à main.
             if [ ! -d "$repository_dir/.git" ]; then

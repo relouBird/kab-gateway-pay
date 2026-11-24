@@ -30,7 +30,7 @@ Enseignement tiré d'un projet précédent (NexusGate) : plusieurs services part
 | D5 | **Packages partagés strictement techniques** (voir §4). Aucun modèle de domaine, aucun accès base, aucune règle métier dans un package partagé. | [DÉCISION] packages partagés · [PROPOSITION] périmètre |
 | D6 | **Une source locale `.env` à la racine**, filtrée et transformée par workspace selon son schéma ; les sorties de build et runtime sont distinctes et générées. À l'exécution, un service ne lit que ses propres variables (voir §5). | [DÉCISION] |
 | D7 | **Communication entre services : événements asynchrones** avec Transactional Outbox. Les appels HTTP synchrones inter-services sont l'exception et doivent être justifiés dans le CDC du cœur concerné. Broker recommandé : RabbitMQ, à confirmer au premier événement inter-services réel. | [PROPOSITION] |
-| D8 | **Authentification inter-services stateless** : JWT signés en asymétrique, clé publique exposée par JWKS par `auth-service`, vérification locale par un guard partagé. | [PROPOSITION] |
+| D8 | **Authentification inter-services stateless** : JWT HS256 vérifiés localement avec un secret runtime partagé par `auth-service` et les services consommateurs. Rotation par chevauchement de secrets ; aucun JWKS ni `kid`. | [DÉCISION] porteur, 25 nov. 2026 |
 | D9 | **Création progressive** : un service n'est créé dans `services/` que lorsque le CDC de son cœur est validé. | [PROPOSITION] |
 | D10 | **Conventions communes** : TypeScript strict, identifiants UUIDv7, horodatages en UTC, montants en entiers (unité mineure) accompagnés du code devise, erreurs normalisées, `correlationId` propagé. | [PROPOSITION] |
 
@@ -78,7 +78,7 @@ kgpay/
 | `@kgpay/config` | Chargement et validation des variables d'environnement (schéma zod), helpers de configuration. | Valeurs de secrets, valeurs spécifiques à un service. |
 | `@kgpay/contracts` | **Contrats backend/frontend et interservices** : schémas d'événements (nom, version, payload), schémas/types de transport HTTP (requêtes/réponses), codes d'erreur, catalogue des permissions et des rôles, types d'états normalisés. Les schémas Yup et leurs types inférés sont une proposition d'ADR-002. | Entités de base de données, logique métier ou décisions d'autorisation prises côté interface. |
 | `@kgpay/common` | Logger structuré, gestion du `correlationId`, filtre d'exceptions, pagination, helpers d'idempotence, gestion des montants, horloge injectable. | Règles métier d'un cœur. |
-| `@kgpay/auth-guard` | Vérification JWT via JWKS, décorateurs `@RequirePermission`, `@RequireStepUp`. | Création de tokens, accès à la base d'`auth-service`. |
+| `@kgpay/auth-guard` | Vérification HS256 via le secret partagé runtime et les secrets précédents pendant une rotation ; décorateurs `@RequirePermission`, `@RequireStepUp`. | Création de tokens, accès à la base d'`auth-service`, publication du secret. |
 | `@kgpay/testing` | Fabriques de données de test, helpers e2e, faux broker. | Code utilisé en production. |
 
 **Règle de dépendance** : `services/*` et `apps/*` peuvent dépendre de `packages/*`. `packages/*` ne dépend jamais de `services/*` ni de `apps/*`. `services/*` ne dépend jamais d'un autre `services/*` ou d'une application. Ces règles sont vérifiées automatiquement (dependency-cruiser ou règle ESLint équivalente) dans la CI.
@@ -125,7 +125,7 @@ Basé sur l'hypothèse du référentiel v0.3 §8.1, précisé pour des services 
 
 | Service | Cœurs hébergés | Remarque | Création |
 | --- | --- | --- | --- |
-| `auth-service` | 1 Identité et accès | Frontière autonome. Émet les jetons et publie les clés. | Premier |
+| `auth-service` | 1 Identité et accès | Frontière autonome. Émet les jetons HS256 ; le secret de vérification est fourni par configuration runtime aux services autorisés. | Premier |
 | `audit-service` | 13 Audit et traçabilité | Stockage en ajout seul. Peu de logique, très transversal : tôt dans la séquence. | Proche du premier |
 | `customer-service` | 2 Cycle de vie client | Dossier, activation, liens client-partenaire, comptes bancaires bénéficiaires. | Étape 1 |
 | `partner-service` | 3 Référentiel partenaires, 4 Configuration des intégrations | Deux modules internes distincts (catalogue / secrets et mappings). | Étape 1 |
@@ -150,6 +150,7 @@ Basé sur l'hypothèse du référentiel v0.3 §8.1, précisé pour des services 
 
 - Plus d'infrastructure (une base par service, un broker) et de la cohérence à terme entre services : certaines vues (ex. client + solde) se composent côté client ou par lecture dérivée d'événements.
 - Sans gateway, chaque service doit appliquer lui-même authentification, limitation de débit et CORS : c'est le rôle de `@kgpay/auth-guard` et de `@kgpay/common`.
+- Le secret HS256 permet à tout service vérificateur de fabriquer aussi des jetons. Son partage élargit l'impact d'une compromission ; il doit être limité aux services de confiance, protégé comme un secret de signature et ne jamais être publié comme JWKS.
 - Le frontend appelle plusieurs bases d'URL (une par service) ou passe par un reverse proxy d'infrastructure.
 
 **Points ouverts**
@@ -166,3 +167,4 @@ Basé sur l'hypothèse du référentiel v0.3 §8.1, précisé pour des services 
 | 1 — Identité et accès | 20 nov. 2026 | Création de l'ADR. Choix D8 (JWT asymétrique + JWKS) induit par l'absence de gateway. |
 | Bootstrap du dépôt | 21 nov. 2026 | Le porteur valide pnpm workspaces et Turborepo ; le dépôt Git local est initialisé sur `main` avec `dev` comme branche d'intégration. |
 | Cœur 1 — backend | 22 nov. 2026 | Une source locale unique `.env` à la racine, filtrée selon les schémas de workspace vers `.generated/env/<workspace>.build.env` et `.runtime.env`. Les secrets restent runtime-only ; les démarrages PostgreSQL et Maildev locaux ou Docker sont documentés. Le relay local d'outbox n'impose pas de broker. |
+| Cœur 1 — signature des jetons | 25 nov. 2026 | D8 est remplacée par la décision HS256 avec secret runtime partagé et vérification/rotation par chevauchement ; aucun JWKS, `kid` ni fichier de clé RSA. Le risque de fabrication de jetons par un vérificateur compromis est documenté. |
