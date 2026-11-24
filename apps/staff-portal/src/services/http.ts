@@ -27,7 +27,10 @@ export function createAuthClient(): AxiosInstance {
     baseURL: env.authApiUrl,
     withCredentials: true,
     timeout: 15_000,
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      "X-KGPay-Portal": "STAFF",
+    },
   });
   client.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {

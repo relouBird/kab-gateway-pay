@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Delete,
   ForbiddenException,
@@ -19,6 +20,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiCookieAuth,
+  ApiHeader,
   ApiOperation,
   ApiResponse,
   ApiSecurity,
@@ -51,8 +53,45 @@ import { TokenService } from '../security/token.service';
 
 const REFRESH_COOKIE = 'kgpay_refresh';
 const CSRF_COOKIE = 'kgpay_csrf';
+const CUSTOMER_REFRESH_COOKIE = 'kgpay_customer_refresh';
+const CUSTOMER_CSRF_COOKIE = 'kgpay_customer_csrf';
+const STAFF_REFRESH_COOKIE = 'kgpay_staff_refresh';
+const STAFF_CSRF_COOKIE = 'kgpay_staff_csrf';
+const PORTAL_HEADER = 'x-kgpay-portal';
+
+type PortalScope = 'CUSTOMER' | 'STAFF';
+
+function cookiesForPortal(scope?: PortalScope): {
+  refresh: string;
+  csrf: string;
+} {
+  if (scope === 'CUSTOMER') {
+    return {
+      refresh: CUSTOMER_REFRESH_COOKIE,
+      csrf: CUSTOMER_CSRF_COOKIE,
+    };
+  }
+  if (scope === 'STAFF') {
+    return { refresh: STAFF_REFRESH_COOKIE, csrf: STAFF_CSRF_COOKIE };
+  }
+  return { refresh: REFRESH_COOKIE, csrf: CSRF_COOKIE };
+}
+
+function getPortalScope(request: Request): PortalScope | undefined {
+  const value = request.header(PORTAL_HEADER)?.toUpperCase();
+  if (!value) return undefined;
+  if (value === 'CUSTOMER' || value === 'STAFF') return value;
+  throw new BadRequestException('X-KGPay-Portal must be CUSTOMER or STAFF.');
+}
 
 @ApiTags('Authentication')
+@ApiHeader({
+  name: PORTAL_HEADER,
+  enum: ['CUSTOMER', 'STAFF'],
+  required: false,
+  description:
+    'Selects the browser-specific refresh/CSRF cookie namespace. Omit for legacy API cookie names.',
+})
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -112,6 +151,7 @@ export class AuthController {
       input,
       getLocale(request),
       getRequestMetadata(request),
+      getPortalScope(request),
     );
   }
 
@@ -131,11 +171,13 @@ export class AuthController {
     roles: string[];
     sessionId: string;
   }> {
+    const portalScope = getPortalScope(request);
     const result = await this.auth.verifyLogin(
       input,
       getRequestMetadata(request),
+      portalScope,
     );
-    setSessionCookies(response, result, this.config);
+    setSessionCookies(response, result, this.config, portalScope);
     return {
       accessToken: result.accessToken,
       tokenType: 'Bearer',
@@ -167,7 +209,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
     await this.auth.resetPassword(input, getRequestMetadata(request));
-    clearSessionCookies(response, this.config);
+    clearSessionCookies(response, this.config, getPortalScope(request));
   }
 
   @Post('password/change')
@@ -181,7 +223,9 @@ export class AuthController {
   ): Promise<void> {
     return this.auth
       .changePassword(request.auth, input, getRequestMetadata(request))
-      .then(() => clearSessionCookies(response, this.config));
+      .then(() =>
+        clearSessionCookies(response, this.config, getPortalScope(request)),
+      );
   }
 
   @Post('invitations/accept')
@@ -271,9 +315,10 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): { csrfToken: string } {
-    const existing = request.cookies?.[CSRF_COOKIE] as string | undefined;
+    const cookies = cookiesForPortal(getPortalScope(request));
+    const existing = request.cookies?.[cookies.csrf] as string | undefined;
     const csrfToken = existing ?? randomBytes(32).toString('base64url');
-    response.cookie(CSRF_COOKIE, csrfToken, {
+    response.cookie(cookies.csrf, csrfToken, {
       secure: this.config.cookieSecure,
       sameSite: this.config.cookieSameSite,
       httpOnly: false,
@@ -299,9 +344,12 @@ export class AuthController {
     roles: string[];
     sessionId: string;
   }> {
-    const cookieToken = request.cookies?.[REFRESH_COOKIE] as string | undefined;
+    const portalScope = getPortalScope(request);
+    const cookies = cookiesForPortal(portalScope);
+    const cookieToken = request.cookies?.[cookies.refresh] as
+      string | undefined;
     if (cookieToken) {
-      assertCsrf(request);
+      assertCsrf(request, cookies.csrf);
     }
     const refreshToken = cookieToken ?? input.refreshToken;
     if (!refreshToken) {
@@ -310,8 +358,9 @@ export class AuthController {
     const result = await this.auth.refresh(
       refreshToken,
       getRequestMetadata(request),
+      portalScope,
     );
-    setSessionCookies(response, result, this.config);
+    setSessionCookies(response, result, this.config, portalScope);
     return {
       accessToken: result.accessToken,
       tokenType: 'Bearer',
@@ -331,15 +380,22 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const cookieToken = request.cookies?.[REFRESH_COOKIE] as string | undefined;
+    const portalScope = getPortalScope(request);
+    const cookies = cookiesForPortal(portalScope);
+    const cookieToken = request.cookies?.[cookies.refresh] as
+      string | undefined;
     if (cookieToken) {
-      assertCsrf(request);
+      assertCsrf(request, cookies.csrf);
     }
     const refreshToken = cookieToken ?? input.refreshToken;
     if (refreshToken) {
-      await this.auth.logout(refreshToken, getRequestMetadata(request));
+      await this.auth.logout(
+        refreshToken,
+        getRequestMetadata(request),
+        portalScope,
+      );
     }
-    clearSessionCookies(response, this.config);
+    clearSessionCookies(response, this.config, portalScope);
   }
 
   @Post('logout-all')
@@ -356,7 +412,9 @@ export class AuthController {
         null,
         getRequestMetadata(request),
       )
-      .then(() => clearSessionCookies(response, this.config));
+      .then(() =>
+        clearSessionCookies(response, this.config, getPortalScope(request)),
+      );
   }
 
   @Get('sessions')
@@ -377,7 +435,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
     if (sessionId === request.auth.sessionId) {
-      clearSessionCookies(response, this.config);
+      clearSessionCookies(response, this.config, getPortalScope(request));
     }
     return this.auth.revokeSession(
       request.auth.identityId,
@@ -406,9 +464,18 @@ function getLocale(request: Request): 'en' | 'fr' {
 
 function setSessionCookies(
   response: Response,
-  result: { refreshToken: string; refreshExpiresAt: Date },
+  result: {
+    refreshToken: string;
+    refreshExpiresAt: Date;
+    subjectType: PortalScope;
+  },
   config: AuthConfig,
+  portalScope?: PortalScope,
 ): void {
+  if (portalScope && portalScope !== result.subjectType) {
+    throw new UnauthorizedException('The portal does not match the identity.');
+  }
+  const cookies = cookiesForPortal(portalScope);
   const maxAge = Math.max(0, result.refreshExpiresAt.getTime() - Date.now());
   const csrfToken = randomBytes(32).toString('base64url');
   const baseCookie = {
@@ -417,28 +484,33 @@ function setSessionCookies(
     path: '/auth',
     maxAge,
   } as const;
-  response.cookie(REFRESH_COOKIE, result.refreshToken, {
+  response.cookie(cookies.refresh, result.refreshToken, {
     ...baseCookie,
     httpOnly: true,
   });
-  response.cookie(CSRF_COOKIE, csrfToken, {
+  response.cookie(cookies.csrf, csrfToken, {
     ...baseCookie,
     httpOnly: false,
   });
 }
 
-function clearSessionCookies(response: Response, config: AuthConfig): void {
+function clearSessionCookies(
+  response: Response,
+  config: AuthConfig,
+  portalScope?: PortalScope,
+): void {
+  const cookies = cookiesForPortal(portalScope);
   const options = {
     secure: config.cookieSecure,
     sameSite: config.cookieSameSite,
     path: '/auth',
   } as const;
-  response.clearCookie(REFRESH_COOKIE, options);
-  response.clearCookie(CSRF_COOKIE, options);
+  response.clearCookie(cookies.refresh, options);
+  response.clearCookie(cookies.csrf, options);
 }
 
-function assertCsrf(request: Request): void {
-  const csrfToken = request.cookies?.[CSRF_COOKIE] as string | undefined;
+function assertCsrf(request: Request, csrfCookieName: string): void {
+  const csrfToken = request.cookies?.[csrfCookieName] as string | undefined;
   const header = request.header('x-csrf-token');
   if (!csrfToken || !header || !equalStrings(csrfToken, header)) {
     throw new ForbiddenException('The CSRF token is invalid.');

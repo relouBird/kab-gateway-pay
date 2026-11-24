@@ -21,6 +21,8 @@ describeIntegration('Auth API (isolated integration e2e)', () => {
   let app: INestApplication<App> | undefined;
   const sentEmails: SendOtpEmailInput[] = [];
   const sentInvitations: Array<{ to: string; token: string }> = [];
+  let customerRefreshCookie = '';
+  let customerCsrfCookie = '';
 
   beforeAll(async () => {
     const emailService = {
@@ -77,7 +79,11 @@ describeIntegration('Auth API (isolated integration e2e)', () => {
     expect(registration.body.challengeId).toBeTruthy();
     expect(latestEmail('contact_verification').to).toBe(email);
 
-    await api.post('/auth/login').send({ email, password }).expect(401);
+    await api
+      .post('/auth/login')
+      .set('X-KGPay-Portal', 'CUSTOMER')
+      .send({ email, password })
+      .expect(401);
     expect(
       sentEmails.filter(({ purpose }) => purpose === 'login'),
     ).toHaveLength(0);
@@ -91,8 +97,18 @@ describeIntegration('Auth API (isolated integration e2e)', () => {
       .expect(200)
       .expect({ status: 'ACTIVE' });
 
+    await api
+      .post('/auth/login')
+      .set('X-KGPay-Portal', 'STAFF')
+      .send({ email, password })
+      .expect(401);
+    expect(
+      sentEmails.filter(({ purpose }) => purpose === 'login'),
+    ).toHaveLength(0);
+
     const login = await api
       .post('/auth/login')
+      .set('X-KGPay-Portal', 'CUSTOMER')
       .send({ email, password })
       .expect(202);
     expect(login.body).not.toHaveProperty('accessToken');
@@ -100,6 +116,7 @@ describeIntegration('Auth API (isolated integration e2e)', () => {
 
     const authenticated = await api
       .post('/auth/mfa/verify')
+      .set('X-KGPay-Portal', 'CUSTOMER')
       .send({
         challengeId: login.body.challengeId,
         code: latestEmail('login').code,
@@ -146,19 +163,27 @@ describeIntegration('Auth API (isolated integration e2e)', () => {
 
     const refreshCookie = cookiePair(
       authenticated.headers['set-cookie'],
-      'kgpay_refresh',
+      'kgpay_customer_refresh',
     );
     const csrfCookie = cookiePair(
       authenticated.headers['set-cookie'],
-      'kgpay_csrf',
+      'kgpay_customer_csrf',
     );
+    customerRefreshCookie = refreshCookie;
+    customerCsrfCookie = csrfCookie;
     const cookies = `${refreshCookie}; ${csrfCookie}`;
-    const csrfToken = csrfCookie.slice('kgpay_csrf='.length);
+    const csrfToken = csrfCookie.slice('kgpay_customer_csrf='.length);
 
-    await api.post('/auth/refresh').set('Cookie', cookies).send({}).expect(403);
+    await api
+      .post('/auth/refresh')
+      .set('X-KGPay-Portal', 'CUSTOMER')
+      .set('Cookie', cookies)
+      .send({})
+      .expect(403);
 
     const refreshed = await api
       .post('/auth/refresh')
+      .set('X-KGPay-Portal', 'CUSTOMER')
       .set('Cookie', cookies)
       .set('X-CSRF-Token', csrfToken)
       .send({})
@@ -167,18 +192,14 @@ describeIntegration('Auth API (isolated integration e2e)', () => {
 
     const rotatedRefreshCookie = cookiePair(
       refreshed.headers['set-cookie'],
-      'kgpay_refresh',
+      'kgpay_customer_refresh',
     );
     const rotatedCsrfCookie = cookiePair(
       refreshed.headers['set-cookie'],
-      'kgpay_csrf',
+      'kgpay_customer_csrf',
     );
-    await api
-      .post('/auth/logout')
-      .set('Cookie', `${rotatedRefreshCookie}; ${rotatedCsrfCookie}`)
-      .set('X-CSRF-Token', rotatedCsrfCookie.slice('kgpay_csrf='.length))
-      .send({})
-      .expect(204);
+    customerRefreshCookie = rotatedRefreshCookie;
+    customerCsrfCookie = rotatedCsrfCookie;
 
     await api.get('/admin/roles').expect(401);
   });
@@ -310,10 +331,12 @@ describeIntegration('Auth API (isolated integration e2e)', () => {
       .expect(200);
     const adminLogin = await api
       .post('/auth/login')
+      .set('X-KGPay-Portal', 'STAFF')
       .send({ email: adminEmail, password: adminPassword })
       .expect(202);
     const adminAuthentication = await api
       .post('/auth/mfa/verify')
+      .set('X-KGPay-Portal', 'STAFF')
       .send({
         challengeId: adminLogin.body.challengeId,
         code: latestEmail('login').code,
@@ -389,11 +412,13 @@ describeIntegration('Auth API (isolated integration e2e)', () => {
 
     const staffLogin = await api
       .post('/auth/login')
+      .set('X-KGPay-Portal', 'STAFF')
       .send({ email: staffEmail, password: staffPassword })
       .expect(202);
     expect(staffLogin.body).not.toHaveProperty('accessToken');
     const staffAuthentication = await api
       .post('/auth/mfa/verify')
+      .set('X-KGPay-Portal', 'STAFF')
       .send({
         challengeId: staffLogin.body.challengeId,
         code: latestEmail('login').code,
@@ -403,10 +428,123 @@ describeIntegration('Auth API (isolated integration e2e)', () => {
       subjectType: 'STAFF',
       roles: ['OPERATIONS_ADMIN'],
     });
+    let staffRefreshCookie = cookiePair(
+      staffAuthentication.headers['set-cookie'],
+      'kgpay_staff_refresh',
+    );
+    let staffCsrfCookie = cookiePair(
+      staffAuthentication.headers['set-cookie'],
+      'kgpay_staff_csrf',
+    );
     await api
       .get('/admin/roles')
       .set('Authorization', `Bearer ${staffAuthentication.body.accessToken}`)
       .expect(403);
+
+    await api
+      .post('/auth/refresh')
+      .set('X-KGPay-Portal', 'CUSTOMER')
+      .send({
+        refreshToken: staffRefreshCookie.slice('kgpay_staff_refresh='.length),
+      })
+      .expect(401);
+    await api
+      .post('/auth/logout')
+      .set('X-KGPay-Portal', 'CUSTOMER')
+      .send({
+        refreshToken: staffRefreshCookie.slice('kgpay_staff_refresh='.length),
+      })
+      .expect(204);
+
+    const refreshedStaff = await api
+      .post('/auth/refresh')
+      .set('X-KGPay-Portal', 'STAFF')
+      .set('Cookie', `${staffRefreshCookie}; ${staffCsrfCookie}`)
+      .set('X-CSRF-Token', staffCsrfCookie.slice('kgpay_staff_csrf='.length))
+      .send({})
+      .expect(200);
+    staffRefreshCookie = cookiePair(
+      refreshedStaff.headers['set-cookie'],
+      'kgpay_staff_refresh',
+    );
+    staffCsrfCookie = cookiePair(
+      refreshedStaff.headers['set-cookie'],
+      'kgpay_staff_csrf',
+    );
+
+    const staffLogout = await api
+      .post('/auth/logout')
+      .set('X-KGPay-Portal', 'STAFF')
+      .set(
+        'Cookie',
+        `${customerRefreshCookie}; ${customerCsrfCookie}; ${staffRefreshCookie}; ${staffCsrfCookie}`,
+      )
+      .set('X-CSRF-Token', staffCsrfCookie.slice('kgpay_staff_csrf='.length))
+      .send({})
+      .expect(204);
+    const staffClearedCookies = cookieHeaders(
+      staffLogout.headers['set-cookie'],
+    );
+    expect(
+      staffClearedCookies.some((cookie) =>
+        cookie.startsWith('kgpay_staff_refresh=;'),
+      ),
+    ).toBe(true);
+    expect(
+      staffClearedCookies.some((cookie) =>
+        cookie.startsWith('kgpay_staff_csrf=;'),
+      ),
+    ).toBe(true);
+    expect(
+      staffClearedCookies.some((cookie) =>
+        cookie.startsWith('kgpay_customer_refresh='),
+      ),
+    ).toBe(false);
+
+    const customerRefresh = await api
+      .post('/auth/refresh')
+      .set('X-KGPay-Portal', 'CUSTOMER')
+      .set('Cookie', `${customerRefreshCookie}; ${customerCsrfCookie}`)
+      .set(
+        'X-CSRF-Token',
+        customerCsrfCookie.slice('kgpay_customer_csrf='.length),
+      )
+      .send({})
+      .expect(200);
+    customerRefreshCookie = cookiePair(
+      customerRefresh.headers['set-cookie'],
+      'kgpay_customer_refresh',
+    );
+    customerCsrfCookie = cookiePair(
+      customerRefresh.headers['set-cookie'],
+      'kgpay_customer_csrf',
+    );
+
+    const customerLogout = await api
+      .post('/auth/logout')
+      .set('X-KGPay-Portal', 'CUSTOMER')
+      .set('Cookie', `${customerRefreshCookie}; ${customerCsrfCookie}`)
+      .set(
+        'X-CSRF-Token',
+        customerCsrfCookie.slice('kgpay_customer_csrf='.length),
+      )
+      .send({})
+      .expect(204);
+    expect(
+      cookieHeaders(customerLogout.headers['set-cookie']).some((cookie) =>
+        cookie.startsWith('kgpay_customer_refresh=;'),
+      ),
+    ).toBe(true);
+    await api
+      .post('/auth/refresh')
+      .set('X-KGPay-Portal', 'CUSTOMER')
+      .set('Cookie', `${customerRefreshCookie}; ${customerCsrfCookie}`)
+      .set(
+        'X-CSRF-Token',
+        customerCsrfCookie.slice('kgpay_customer_csrf='.length),
+      )
+      .send({})
+      .expect(401);
   });
 
   function latestEmail(
@@ -423,13 +561,13 @@ describeIntegration('Auth API (isolated integration e2e)', () => {
     setCookie: string | string[] | undefined,
     name: string,
   ): string {
-    const cookies = Array.isArray(setCookie)
-      ? setCookie
-      : setCookie
-        ? [setCookie]
-        : [];
+    const cookies = cookieHeaders(setCookie);
     const cookie = cookies.find((value) => value.startsWith(`${name}=`));
     if (!cookie) throw new Error(`The ${name} cookie was not set.`);
     return cookie.split(';', 1)[0];
+  }
+
+  function cookieHeaders(setCookie: string | string[] | undefined): string[] {
+    return Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
   }
 });

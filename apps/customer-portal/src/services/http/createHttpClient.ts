@@ -18,6 +18,7 @@ export interface HttpClientOptions {
   getLanguage: () => string;
   refreshAccessToken: () => Promise<string | null>;
   timeoutMs?: number;
+  defaultHeaders?: Readonly<Record<string, string>>;
 }
 
 export function createCorrelationId(): string {
@@ -33,7 +34,7 @@ export function createHttpClient(options: HttpClientOptions): AxiosInstance {
     baseURL: options.baseURL,
     withCredentials: true,
     timeout: options.timeoutMs ?? 15_000,
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...options.defaultHeaders },
   });
 
   client.interceptors.request.use(async (config) => {

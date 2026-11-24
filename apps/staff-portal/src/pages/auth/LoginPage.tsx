@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { loginSchema } from "@kgpay/contracts/transport";
 import { Button } from "../../components/ui/Button";
+import { Notice } from "../../components/ui/Notice";
 import { PageTitle } from "../../components/ui/PageTitle";
 import { TextField } from "../../components/ui/TextField";
 import { useYupForm } from "../../composables/useYupForm";
@@ -15,7 +16,9 @@ const initialLoginValues = { email: "", password: "" };
 
 export function LoginPage() {
   const { t } = useTranslation();
+  const location = useLocation();
   const navigate = useNavigate();
+  const passwordReset = location.state?.passwordReset === true;
   const startFlow = useOtpFlowStore((state) => state.start);
   const form = useYupForm({
     formId: "staff-login",
@@ -49,6 +52,7 @@ export function LoginPage() {
   return (
     <div className="stack">
       <PageTitle title={t("loginTitle")} subtitle={t("loginSubtitle")} />
+      {passwordReset ? <Notice tone="success">{t("success")}</Notice> : null}
       {error ? <ErrorNotice message={error} reference={reference} /> : null}
       <form
         className="stack"

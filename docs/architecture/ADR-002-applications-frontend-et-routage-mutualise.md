@@ -36,6 +36,7 @@ La cible de déploiement envisagée est un hébergement mutualisé. Sa capacité
 | D9 | Pour une action UI déclarée annulable, différer l'envoi de la requête de deux secondes et permettre l'annulation côté client pendant ce délai. Après envoi, seule la réponse serveur confirme le succès ou l'échec. | [DÉCISION] délai et comportement frontend |
 | D10 | Utiliser un marqueur de suppression logique (ex. `deletedAt`) seulement pour les domaines qui l'exigent ; les écritures ledger, événements d'audit et traces financières ne sont jamais supprimés physiquement. | [PROPOSITION] |
 | D11 | Créer un client Axios réutilisable qui expose une instance configurée par service backend, avec un `baseURL` indépendant. Chaque service reste déployable et configurable séparément. | [DÉCISION] besoin fonctionnel ; [PROPOSITION] structure technique |
+| D12 | Isoler les cookies de refresh et CSRF des portails CUSTOMER et STAFF, sélectionnés côté backend par `X-KGPay-Portal`. Une connexion, une rotation ou une déconnexion dans un portail ne doit pas affecter la session de l'autre. | [DÉCISION] porteur, 24 novembre 2026 |
 
 ## 3. Partage des contrats sans partager les responsabilités métier
 
@@ -56,7 +57,7 @@ Le délai d'annulation de deux secondes est une fenêtre locale avant l'envoi HT
 - Le même mécanisme accepte une URL relative sous un domaine commun (par exemple `/auth`, `/payments`) ou une URL absolue si un service est déployé sur un domaine distinct. Les valeurs sont de la configuration publique non secrète ; aucune clé ou secret ne va dans une variable `VITE_*`.
 - Les intercepteurs partagés peuvent propager `correlationId`, gérer les en-têtes communs et normaliser les erreurs. L'ajout d'identifiants d'authentification doit suivre une politique explicite (client public/privé ou option de requête typée), jamais une déduction fragile par recherche de sous-chaîne dans l'URL.
 - Aucun intercepteur ne journalise l'objet Axios complet, le corps de requête/réponse, le mot de passe, le code MFA/OTP ou les jetons. Les réponses d'erreur réseau sans `response` doivent rester traitées explicitement.
-- Le choix de transport d'authentification (cookie sécurisé ou jeton) et de stockage frontend reste un point ouvert du CDC-01 ; la fabrique ne doit pas figer ce choix implicitement.
+- Pour le CDC-01, l'access token et l'état de session restent en mémoire, et le refresh utilise un cookie HttpOnly protégé par CSRF. Les deux portails utilisent des noms de cookies séparés selon D12 ; la fabrique accepte le contexte de portail dans ses en-têtes par défaut.
 
 ## 4. Structure applicative indicative
 
@@ -124,7 +125,7 @@ Les chemins d'exemple ne constituent pas encore des routes HTTP contractuelles. 
 1. Offre mutualisée exacte et support du reverse proxy, des processus Node.js et des bases.
 2. ~~Deux applications déployables ou deux zones d'une même application.~~ Tranché : deux applications (D2).
 3. ~~Contrat et version de Yup dans `@kgpay/contracts`~~ (tranché, D3 ; Yup `^1.7.1`) ; critères justifiant un package partagé de composants UI restent à définir.
-4. Stratégie de session dans les navigateurs et origines exactes des interfaces et API.
+4. ~~Stratégie de session et isolation CUSTOMER/STAFF.~~ Tranché : D12. Les origines exactes des interfaces et API, `SameSite` et la configuration de production restent à confirmer.
 5. ~~Langue initiale par défaut et manière de mémoriser le choix français/anglais.~~ Tranché : langue du navigateur avec repli sur le français, choix mémorisé en `localStorage` (`kgpay.locale`).
 6. Devise par défaut, unités mineures et source de la liste des devises autorisées.
 7. Ressources auxquelles s'applique la fenêtre annulable de deux secondes ; exclusions nécessaires pour les actions financières, sensibles et de sécurité urgente.
@@ -155,7 +156,7 @@ Les chemins d'exemple ne constituent pas encore des routes HTTP contractuelles. 
 - **Application :** `apps/customer-portal` (React 19, Vite, React Router, Zustand, react-i18next, Axios, Vitest + Testing Library). Les dépendances sont déclarées dans son manifest ; les polices Inter, Inter Tight et IBM Plex Mono sont servies localement via Fontsource.
 - **Contrats partagés :** `@kgpay/contracts/transport` expose les schémas Yup (messages = clés i18n) et les types de transport. L'application le consomme par alias vers les sources (Vite et `paths` TypeScript), car le package compile en CommonJS. Aucune entité Prisma ni règle métier n'y figure.
 - **Client HTTP (D11) :** fabrique `createHttpClient` ; une instance `authApi` pour `auth-service`, `baseURL` issu de `VITE_AUTH_API_URL__CUSTOMER_PORTAL`. L'authentification est demandée explicitement par appel (`authentication: "access-token"`), jamais déduite de l'URL ; un seul rejeu après refresh sur 401. Aucune journalisation de payload ni de jeton.
-- **Session :** access token et état de session en mémoire uniquement. Le refresh passe par `GET /auth/csrf` (le cookie `kgpay_csrf` est limité au chemin `/auth`) puis `POST /auth/refresh`, sérialisé (single-flight + `navigator.locks`) car la rotation révoque la famille de sessions en cas de réutilisation.
+- **Session :** access token et état de session en mémoire uniquement. `X-KGPay-Portal: CUSTOMER` sélectionne les cookies `kgpay_customer_refresh` et `kgpay_customer_csrf`, limités au chemin `/auth`; le refresh passe par `GET /auth/csrf` puis `POST /auth/refresh`, sérialisé (single-flight + `navigator.locks`) car la rotation révoque la famille de sessions en cas de réutilisation.
 - **Variables d'environnement :** `VITE_AUTH_API_URL` (requise), `VITE_PASSWORD_MIN_LENGTH` et `VITE_OTP_RESEND_COOLDOWN_SECONDS` (optionnelles) sous le préfixe `__CUSTOMER_PORTAL`. Ces deux valeurs dupliquent la configuration backend (`PASSWORD_MIN_LENGTH`, `OTP_RESEND_COOLDOWN_SECONDS`) : le backend reste l'autorité.
 - **[POINT OUVERT]** Origines/cookies/CSRF en production, absence de `GET /auth/me` (l'e-mail courant n'est pas affichable), compatibilité de l'hébergement mutualisé.
 
@@ -166,7 +167,7 @@ Les chemins d'exemple ne constituent pas encore des routes HTTP contractuelles. 
 - **Application :** `apps/staff-portal` est un workspace React 19/Vite distinct, aligné sur l'espace client pour React Router, Zustand, react-i18next, Axios, Yup, Vitest/Testing Library, polices locales et identité visuelle KG Pay.
 - **Architecture UI :** `App.tsx` reste limité au bootstrap ; les routes, layouts/gardes, pages, composants UI, composantes d'administration, composables, traductions FR/EN et feuilles `tokens/base/components` suivent désormais l'organisation de `customer-portal`. Les parcours STAFF et les contrats d'API restent propres à cette application.
 - **Parcours :** connexion personnel avec OTP obligatoire, acceptation d'invitation, récupération/réinitialisation de mot de passe, gestion des identités/rôles, récupération d'e-mail STAFF avec step-up, journal/revue des accès et sessions propres accessibles à tout STAFF authentifié. L'interface masque les fonctions d'administration aux comptes sans `GLOBAL_SUPER_ADMIN` uniquement pour l'ergonomie ; `auth-service` conserve l'autorité d'accès.
-- **Transport :** les types et schémas de validation de l'administration sont ajoutés à `@kgpay/contracts/transport`. L'application utilise les routes existantes, les preuves step-up et les clients Axios authentifiés explicitement. L'access token reste en mémoire ; le refresh utilise le cookie sécurisé et les appels CSRF/refresh/logout.
+- **Transport :** les types et schémas de validation de l'administration sont ajoutés à `@kgpay/contracts/transport`. L'application utilise les routes existantes, les preuves step-up et les clients Axios authentifiés explicitement. `X-KGPay-Portal: STAFF` sélectionne les cookies `kgpay_staff_refresh` et `kgpay_staff_csrf`; l'access token reste en mémoire et le refresh/logout restent protégés par CSRF.
 - **Configuration :** `VITE_AUTH_API_URL__STAFF_PORTAL` et l'origine locale `http://localhost:5174` sont ajoutées au modèle `.env.example`/CORS.
 - **Limites / points ouverts :** le catalogue d'autorisations publié ne permet aucune permission non-super-admin aux rôles personnalisés ; `GET /admin/identities` ne fournit pas `lockedUntil` ; aucune route ne liste les sessions d'une autre identité. Les gabarits HTML bilingues OTP/invitation sont une proposition ; la copie finale et la recette de livraison restent ouvertes (CDC-01 §10.16). Le lien d'invitation STAFF est optionnel via `STAFF_PORTAL_URL__AUTH_SERVICE`.
 

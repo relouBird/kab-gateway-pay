@@ -50,6 +50,19 @@ describe("refreshSession", () => {
     expect(useSessionStore.getState().status).toBe("anonymous");
   });
 
+  it("refuse de restaurer un jeton de session STAFF", async () => {
+    useSessionStore.getState().setSession(tokens);
+    vi.mocked(authService.getCsrf).mockResolvedValue({ csrfToken: "csrf" });
+    vi.mocked(authService.refresh).mockResolvedValue({
+      ...tokens,
+      subjectType: "STAFF",
+      roles: ["OPERATIONS_ADMIN"],
+    });
+
+    expect(await refreshSession()).toBeNull();
+    expect(useSessionStore.getState().status).toBe("anonymous");
+  });
+
   it("conserve la session sur erreur réseau", async () => {
     useSessionStore.getState().setSession(tokens);
     vi.mocked(authService.getCsrf).mockRejectedValue(
