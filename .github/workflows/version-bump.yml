@@ -1,13 +1,14 @@
 name: Bump monorepo version
 
+# dev propose un patch, main un minor; le lancement manuel confirmé sur main propose un major.
 on:
-  # S'execute lors d'un push sur les branches dev ou main
+  # Déclenche un bump automatique après un push sur dev ou main.
   push:
     branches:
       - dev
       - main
 
-  # S'execute manuellement via le workflow_dispatch
+  # Le bump major est volontairement manuel et demande une confirmation explicite.
   workflow_dispatch:
     inputs:
       confirm_major:
@@ -17,9 +18,11 @@ on:
         default: false
 
 permissions:
+  # Nécessaire pour créer la branche et la pull request d'automatisation.
   contents: write # Permission to write repository contents
   pull-requests: write # Permission to create and update pull requests
 
+# Évite deux calculs/PR concurrents pour la même branche.
 concurrency:
   group: monorepo-version-${{ github.ref_name }}
   cancel-in-progress: false
@@ -51,6 +54,7 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
           HEAD_SHA: ${{ github.sha }}
         run: |
+          # Le merge de la PR de bump ne doit pas déclencher une nouvelle PR de bump.
           version_only="$(node scripts/bump-version.cjs --is-version-only "$BEFORE_SHA" "$HEAD_SHA")"
           echo "skip=$version_only" >> "$GITHUB_OUTPUT"
 
@@ -63,6 +67,7 @@ jobs:
           CONFIRM_MAJOR: ${{ inputs.confirm_major }}
         shell: bash
         run: |
+          # Règle de versionnement: push dev = patch, push main = minor, dispatch main = major.
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             if [[ "$BRANCH_NAME" != "main" ]]; then
               echo "Manual major bumps are allowed only from main."
@@ -91,6 +96,7 @@ jobs:
         if: steps.changes.outputs.skip != 'true'
         uses: peter-evans/create-pull-request@v7
         with:
+          # Le workflow propose une PR; il ne fusionne jamais la version automatiquement.
           token: ${{ secrets.GITHUB_TOKEN }}
           base: ${{ github.ref_name }}
           branch: automation/version-bump-${{ github.ref_name }}

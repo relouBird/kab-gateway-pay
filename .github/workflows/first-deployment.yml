@@ -1,0 +1,16 @@
+name: First KG Pay deployment
+
+# À lancer manuellement une seule fois pour initialiser le clone et la première release.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  initialize:
+    # Le workflow de production partage le verrou avec les déploiements automatiques.
+    uses: ./.github/workflows/build-artifacts.yml
+    with:
+      mode: initialize
+    secrets: inherit
