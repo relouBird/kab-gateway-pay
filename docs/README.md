@@ -8,22 +8,22 @@ Plateforme d'agrégation et d'orchestration de paiements : elle centralise plusi
 
 ## 1. État d'avancement
 
-| Cœur | Intitulé | Service | CDC | Code |
-| --- | --- | --- | --- | --- |
-| 1 | Identité et accès | `auth-service` | Brouillon v0.1 (`docs/cdc/CDC-01-identite-acces.md`) | Non démarré |
-| 2 | Cycle de vie client | `customer-service` | À faire | — |
-| 3 | Référentiel partenaires et méthodes | `partner-service` | À faire | — |
-| 4 | Configuration des intégrations | `partner-service` | À faire | — |
-| 5 | Orchestration des paiements | `payment-service` | À faire | — |
-| 6 | Comptes et comptabilité interne | `ledger-service` | À faire | — |
-| 7 | Versements | `payout-service` | À faire | — |
-| 8 | Tarification | `ledger-service` | À faire | — |
-| 9 | Risque et conformité | `risk-service` | À faire | — |
-| 10 | Opérations internes | `ops-service` | À faire | — |
-| 11 | Rapprochement | `ops-service` | À faire | — |
-| 12 | Notifications et reporting | `notification-service` | À faire | — |
-| 13 | Audit et traçabilité | `audit-service` | À faire | — |
-| 14 | Litiges et contestations | `ops-service` | À faire | — |
+| Cœur | Intitulé                            | Service                | CDC                                                                             | Code                                                                                      |
+| ---- | ----------------------------------- | ---------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1    | Identité et accès                   | `auth-service`         | Base V1 validée, points ouverts conservés (`docs/cdc/CDC-01-identite-acces.md`) | Portails client/personnel implémentés ; recette globale et gabarits de courriel à valider |
+| 2    | Cycle de vie client                 | `customer-service`     | À faire                                                                         | —                                                                                         |
+| 3    | Référentiel partenaires et méthodes | `partner-service`      | À faire                                                                         | —                                                                                         |
+| 4    | Configuration des intégrations      | `partner-service`      | À faire                                                                         | —                                                                                         |
+| 5    | Orchestration des paiements         | `payment-service`      | À faire                                                                         | —                                                                                         |
+| 6    | Comptes et comptabilité interne     | `ledger-service`       | À faire                                                                         | —                                                                                         |
+| 7    | Versements                          | `payout-service`       | À faire                                                                         | —                                                                                         |
+| 8    | Tarification                        | `ledger-service`       | À faire                                                                         | —                                                                                         |
+| 9    | Risque et conformité                | `risk-service`         | À faire                                                                         | —                                                                                         |
+| 10   | Opérations internes                 | `ops-service`          | À faire                                                                         | —                                                                                         |
+| 11   | Rapprochement                       | `ops-service`          | À faire                                                                         | —                                                                                         |
+| 12   | Notifications et reporting          | `notification-service` | À faire                                                                         | —                                                                                         |
+| 13   | Audit et traçabilité                | `audit-service`        | À faire                                                                         | —                                                                                         |
+| 14   | Litiges et contestations            | `ops-service`          | À faire                                                                         | —                                                                                         |
 
 Mettre à jour ce tableau à chaque validation de CDC et à chaque livraison de code.
 
@@ -37,7 +37,12 @@ Les documents sont dans `docs/`. En cas de conflit, l'ordre de priorité est le 
 4. **Le référentiel v0.3** (`docs/KG Pay – Core Business Version-0.3.md`), pour la vision, le vocabulaire, les règles RP et les diagrammes.
 5. Les versions v0.1 et v0.2 : **historique uniquement**, ne pas les utiliser pour décider.
 
-Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration. Le workspace pnpm/Turborepo est en place ; aucun service ni frontend applicatif n'est encore implémenté. Aucun remote GitHub n'est configuré.
+Le dépôt Git local est initialisé à sa racine sur `main`, avec une branche `dev` pour l'intégration et des branches de
+travail dérivées de `dev`. Le workspace pnpm/Turborepo et le remote `origin` sont en place. `auth-service` possède des
+tests unitaires et des parcours HTTP intégrés CUSTOMER/STAFF sur un schéma PostgreSQL temporaire isolé. Une recette
+supplémentaire valide l'envoi SMTP réel via Maildev/MCP pour les OTP de contact, connexion, récupération et step-up,
+ainsi que l'invitation STAFF. Ces essais ne constituent pas à eux seuls la recette complète du CDC-01 ; les autres
+scénarios d'administration et de sécurité restent à couvrir. Les deux portails frontend sont présents ; les gabarits HTML bilingues OTP/invitation sont implémentés en proposition et leur copie finale reste à valider.
 
 Le template de dossier est mentionné dans des documents existants, mais aucun fichier de template n'est présent dans `docs/` à la date de cette revue. Ne pas supposer qu'il existe ; le créer ou corriger les références avant de l'utiliser.
 
@@ -55,18 +60,23 @@ Détails et justifications : `docs/architecture/ADR-001-monorepo-microservices.m
 - **Une base par service.** Aucun accès à la base d'un autre service. Un schéma Prisma par service, aucun package Prisma partagé.
 - **Communication** : événements asynchrones avec Transactional Outbox ; appels HTTP inter-services seulement s'ils sont justifiés dans un CDC.
 - **Authentification** : `auth-service` émet des JWT asymétriques ; les autres services les vérifient localement via JWKS avec `@kgpay/auth-guard`.
-- **Packages partagés** (`packages/`) : strictement techniques (`config`, `contracts`, `common`, `auth-guard`, `testing`). `contracts` peut fournir les schémas/types de transport communs au frontend et au backend ; jamais de modèle de persistance ni de décision métier côté interface.
+- **Packages partagés** (`packages/`) : strictement techniques (`config`, `contracts`, `common`, `auth-guard`, `testing`). `@kgpay/contracts` partage les schémas Yup/types de transport frontend/backend conformément à ADR-002 D3 ; jamais de modèle de persistance ni de décision métier côté interface.
 - **Frontend** : interfaces cadrées cœur par cœur dans les CDC correspondants ; voir [ADR-002](./architecture/ADR-002-applications-frontend-et-routage-mutualise.md) pour les propositions d'organisation, de contrats partagés et de routage.
+- `apps/customer-portal` couvre les parcours client du CDC-01 : inscription, OTP e-mail, connexion, récupération/changement de mot de passe, changement d'e-mail/téléphone avec step-up et sessions.
+- `apps/staff-portal` couvre les parcours personnels : connexion OTP, acceptation d'invitation, récupération de mot de passe, identités STAFF, rôles, récupération d'e-mail STAFF, revue/journal des accès et sessions propres accessibles à tout STAFF authentifié. L'administration est réservée visuellement à `GLOBAL_SUPER_ADMIN` ; les autorisations restent contrôlées par `auth-service`.
+- En développement, autoriser `http://localhost:5173` et `http://localhost:5174` dans `AUTH_CORS_ORIGINS__AUTH_SERVICE` et ajouter les clés `VITE_*__CUSTOMER_PORTAL` et `VITE_*__STAFF_PORTAL` de `.env.example` au `.env` racine.
 - **Un service n'est créé que lorsque le CDC de son cœur est validé.**
 
 ```text
 kgpay/
 ├── docs/            # référentiels, ADR, CDC (template à créer)
 ├── apps/            # applications web (cible proposée dans ADR-002)
-├── env/global.env   # variables non secrètes partagées AU BUILD
+├── .env             # source locale unique, ignorée par Git
+├── .env.example     # modèle versionné sans secrets
+├── .generated/env/  # sorties générées et ignorées, par workspace et usage
 ├── packages/        # @kgpay/config, contracts, common, auth-guard, testing
 ├── services/        # un dossier par microservice
-└── scripts/         # build-env.ts, etc.
+└── scripts/         # generate-env.cjs, etc.
 ```
 
 ## 4. Règles impératives pour l'IA
@@ -84,7 +94,7 @@ kgpay/
 
 - Ne pas inventer d'endpoint, de règle, de valeur chiffrée ou de décision absents des documents. Les valeurs par défaut des CDC sont des propositions configurables.
 - Ne pas créer d'`api-gateway`, de base partagée entre services, ni d'import d'un service vers un autre.
-- Ne pas mettre de secret dans `global.env`, `service.env`, les journaux, les événements ou les messages d'erreur.
+- Ne jamais committer de secret dans `.env.example`, les journaux, les événements ou les messages d'erreur. Le `.env` racine local est ignoré ; ses sorties runtime générées le sont également.
 - Ne pas contourner les invariants métier de la section 5, même « temporairement ».
 - Ne pas supposer qu'une fonctionnalité décrite est implémentée : vérifier le code.
 
@@ -117,29 +127,59 @@ Issus du référentiel v0.3 (§2, §6.1, règles RP) :
 
 ## 7. Variables d'environnement
 
-- `env/global.env` : variables **non secrètes** communes ; copiées dans un service **uniquement au build**, et seulement celles qu'il déclare dans `sharedKeys` (`env.schema.ts`).
-- `services/<service>/service.env` : variables propres non secrètes.
-- **Secrets** : injectés au déploiement ou via `.env.local` (ignoré par Git).
-- Au démarrage, un service valide sa configuration (`@kgpay/config`) et **refuse de démarrer** si elle est invalide.
-- À l'exécution, un service ne lit jamais `env/global.env`.
+Par défaut, la source locale est `.env` à la racine. Des profils locaux comme `.env.test` et `.env.prod` peuvent aussi être conservés ; ils sont ignorés par Git et sélectionnés explicitement par les commandes qui acceptent `--env-file`. Ne jamais copier un profil par-dessus le `.env` local pour changer d'environnement. Aucun fichier `.env` source n'est chargé directement par un service : les variables sont filtrées et générées par workspace. `.env.example` décrit les noms attendus sans contenir de secrets ; le profil réel doit être fourni localement ou placé de manière sécurisée sur l'hôte de déploiement.
+
+Les clés communes prennent la forme `GLOBAL__<KEY>` ; les clés propres à un workspace utilisent un suffixe qui identifie leur cible (par exemple `DATABASE_URL__AUTH_SERVICE`, `VITE_AUTH_API_URL__CUSTOMER_PORTAL`). Le générateur retire ce préfixe/suffixe pour écrire le nom que le code cible attend. Un `env.schema.json` conserve `properties`, `requiredKeys` et `sharedKeys`, et déclare aussi `targetPrefix`, `runtimeOnlyKeys` et `runtimeRequiredKeys`.
+
+Les sorties sont centralisées et ignorées dans `.generated/env/`, à la racine du dépôt :
+
+- `.generated/env/auth-service.build.env` contient uniquement les variables autorisées au build ; aucune URL de base, clé privée, clé HMAC ou credential SMTP n'y est copiée.
+- `.generated/env/auth-service.runtime.env` contient la configuration runtime nécessaire à `auth-service`, secrets inclus. Il est lu au démarrage ou par les commandes Prisma, n'est pas copié dans `dist` et ne doit pas être publié.
+- Lorsqu'une future application ou un futur service déclare son `env.schema.json`, le générateur produit les mêmes fichiers avec son nom de workspace (`<workspace>.build.env` et `<workspace>.runtime.env`). Les packages partagés n'ont pas d'environnement par défaut ; leur configuration leur est passée par le consommateur.
+
+`pnpm env:build` et `pnpm env:runtime` génèrent les sorties de tous les workspaces déclarant un schéma. Les tâches Turbo `build` et `dev` les déclenchent avant leur orchestration ; les scripts ciblés d'un workspace régénèrent aussi ses fichiers lorsqu'il est démarré ou buildé seul. Les variables déjà injectées dans le processus gardent la priorité sur les valeurs du `.env`. Lorsqu'un `--source-file` explicite est sélectionné, ce fichier est prioritaire et un `--output-dir` temporaire peut éviter d'écrire les sorties dans le dépôt.
 
 ## 8. Commandes disponibles et cibles
 
-Commande actuellement disponible :
+Commandes de validation actuellement disponibles :
 
 ```bash
 pnpm install
+pnpm env:build
+pnpm env:runtime
+pnpm dev
+pnpm run build
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+pnpm test:e2e:auth-service
+pnpm test:e2e:auth-service:isolated
+pnpm test:e2e:auth-service:maildev
+pnpm build:auth-service
+pnpm dev:customer-portal
+pnpm build:customer-portal
+pnpm lint:customer-portal
+pnpm typecheck:customer-portal
+pnpm test:customer-portal
+pnpm dev:staff-portal
+pnpm build:staff-portal
+pnpm lint:staff-portal
+pnpm typecheck:staff-portal
+pnpm test:staff-portal
+pnpm start:auth-service
+pnpm auth:keygen
+pnpm db:auth-service:generate
+pnpm db:auth-service:migrate:dev
+pnpm db:auth-service:migrate:deploy
 ```
 
-Les commandes suivantes ne deviennent disponibles qu'après déclaration de scripts dans les manifests des packages :
+Les commandes racine fournissent les alias ciblés par workspace, par exemple `build:customer-portal`, `build:staff-portal`, `dev:staff-portal`, `lint:staff-portal`, `typecheck:staff-portal` et `test:staff-portal`, ainsi que les commandes d'`auth-service`. Les scripts `build`, `dev`, `lint`, `typecheck` et `test` restent dans le manifest de chaque workspace car Turbo les appelle directement.
 
-```bash
-pnpm env:build            # fusionne global.env + service.env vers les builds
-pnpm build                # build de tous les services et packages (Turborepo)
-pnpm test                 # tests unitaires et d'intégration
-pnpm lint                 # lint + règles de dépendance entre packages et services
-pnpm --filter auth-service start:dev
-```
+Pour `auth-service`, fournir une configuration locale puis démarrer avec `pnpm start:auth-service`. Le générateur ciblé est également exécuté automatiquement par les commandes de démarrage et de migration. La commande `pnpm db:auth-service:migrate:deploy -- --env-file .env.test` sélectionne explicitement un profil pour une migration locale ; sans option, elle utilise toujours `.env`.
+
+Les workflows PlanetHoster et leur configuration sont décrits dans le [README développeur](../README.md#builds-et-déploiements-planethoster) et l'ADR-002. Le build GitHub reconstruit temporairement son `.env` depuis le secret d'environnement `KG_PAY_APP_ENV`, puis le supprime; le workflow ne transfère aucun `.env` vers PH. L'opérateur dépose séparément `.env.prod` sous le nom `.env` dans l'APP_ROOT privé d'`auth-service`; le workflow le transforme en sortie runtime générée. Les migrations de production sont manuelles et distinctes du déploiement ; suivre la [procédure dédiée](./deployment/planethoster-manual-migrations.md).
+
+En développement/test, `/docs` expose Swagger UI et `/docs-json` le contrat OpenAPI exploitable par un outil ou un agent. Une collection Postman couvrant les opérations documentées est disponible dans [`services/auth-service/collections/auth-service.postman_collection.json`](../services/auth-service/collections/auth-service.postman_collection.json).
 
 ## 9. Workflow d'un cœur métier
 

@@ -10,6 +10,7 @@ node_modules/
 .turbo/
 dist/
 coverage/
+/.generated/
 
 # Local environment and generated environment files
 .env
@@ -19,6 +20,7 @@ coverage/
 *.local
 *.local.*
 **/build.env
+**/.local-secrets/
 
 # Logs and operating system files
 *.log

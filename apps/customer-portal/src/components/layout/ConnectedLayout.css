@@ -1,0 +1,285 @@
+.app-shell.app-shell--connected {
+  display: grid;
+  min-height: 100svh;
+  grid-template-columns: 264px minmax(0, 1fr);
+  gap: 0;
+  background: var(--bg);
+}
+
+.app-shell--connected .app-shell__sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 100svh;
+  flex-direction: column;
+  gap: 36px;
+  padding: 32px 16px 20px;
+  background: var(--kg-green-900);
+  color: var(--kg-sand-50);
+}
+
+html[data-theme="dark"] .app-shell--connected .app-shell__sidebar {
+  background: var(--surface);
+}
+
+.app-shell--connected .app-shell__nav {
+  display: grid;
+  gap: 4px;
+}
+
+.app-shell--connected .app-shell__nav a {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  color: rgba(246, 241, 231, 0.82);
+  font-size: 16px;
+  font-weight: 400;
+  text-decoration: none;
+  transition:
+    background-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
+}
+
+.app-shell--connected .app-shell__nav a:hover {
+  background: rgba(246, 241, 231, 0.1);
+  color: var(--kg-sand-50);
+}
+
+.app-shell--connected .app-shell__nav a[aria-current="page"] {
+  background: rgba(246, 241, 231, 0.12);
+  box-shadow: inset 3px 0 0 var(--kg-sand-yellow);
+  color: var(--kg-sand-50);
+}
+
+.app-shell--connected .app-shell__nav svg {
+  flex: 0 0 auto;
+}
+
+.app-shell--connected .app-shell__profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+  padding: 16px 8px 0;
+  border-top: 1px solid rgba(246, 241, 231, 0.2);
+}
+
+.app-shell--connected .app-shell__profile-mark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(246, 241, 231, 0.35);
+  border-radius: 50%;
+  color: var(--kg-sand-yellow);
+  font: 500 13px/1 var(--font-mono);
+}
+
+.app-shell--connected .app-shell__profile-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  color: var(--kg-sand-50);
+  font-size: 14px;
+}
+
+.app-shell--connected .app-shell__profile-copy strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell--connected .app-shell__profile-copy span {
+  color: rgba(246, 241, 231, 0.72);
+}
+
+.app-shell--connected .app-shell__content {
+  min-width: 0;
+}
+
+.app-shell--connected .app-shell__header {
+  display: flex;
+  width: 100%;
+  max-width: 1280px;
+  min-height: 120px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 auto;
+  padding: 24px clamp(16px, 4vw, 56px) 20px;
+  border: 0;
+  background: transparent;
+}
+
+.app-shell--connected .app-shell__intro {
+  min-width: 0;
+}
+
+.app-shell--connected .app-shell__date {
+  margin: 0;
+  color: var(--text-muted);
+  font: 500 14px/1.5 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app-shell--connected .app-shell__greeting {
+  margin: 8px 0 0;
+  font: 300 clamp(30px, 3.2vw, 40px) / 1.1 var(--font-title);
+  letter-spacing: -0.035em;
+}
+
+.app-shell--connected .app-shell__tools {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.app-shell--connected .app-shell__tools .btn--ghost {
+  min-height: 48px;
+  padding: 0 12px;
+  color: var(--text);
+}
+
+.connected-theme {
+  display: inline-flex;
+  min-height: 54px;
+  overflow: hidden;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid var(--kg-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.connected-theme button {
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: 500 14px/1 var(--font-ui);
+  transition:
+    background-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
+}
+
+.connected-theme button[aria-pressed="true"] {
+  background: var(--kg-sand-yellow);
+  color: var(--kg-ink);
+}
+
+.connected-theme button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.app-shell--connected .app-shell__main {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 8px clamp(16px, 4vw, 56px) 64px;
+}
+
+.app-shell--connected .app-shell__mobile-nav {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .app-shell.app-shell--connected {
+    display: block;
+    min-height: 100svh;
+    padding-bottom: 0;
+  }
+
+  .app-shell--connected .app-shell__sidebar {
+    display: none;
+  }
+
+  .app-shell--connected .app-shell__header {
+    position: static;
+    top: auto;
+    z-index: auto;
+    min-height: auto;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px 16px 16px;
+  }
+
+  .app-shell--connected .app-shell__greeting {
+    font-size: 32px;
+  }
+
+  .app-shell--connected .app-shell__tools {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .app-shell--connected .app-shell__main {
+    padding: 8px 16px 112px;
+  }
+
+  .app-shell--connected .app-shell__mobile-nav {
+    position: fixed;
+    z-index: 5;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    justify-content: space-around;
+    gap: 4px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--kg-border);
+    background: var(--surface);
+  }
+
+  .app-shell--connected .app-shell__mobile-nav a {
+    display: flex;
+    min-width: 0;
+    min-height: 56px;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .app-shell--connected .app-shell__mobile-nav a[aria-current="page"] {
+    background: rgba(199, 126, 44, 0.12);
+    color: var(--kg-green-900);
+    font-weight: 600;
+  }
+
+  html[data-theme="dark"]
+    .app-shell--connected
+    .app-shell__mobile-nav
+    a[aria-current="page"] {
+    color: var(--kg-sand-yellow);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell--connected .app-shell__nav a,
+  .connected-theme button {
+    transition: none;
+  }
+}

@@ -1,0 +1,109 @@
+name: Bump monorepo version
+
+# dev propose un patch, main un minor; le lancement manuel confirmé sur main propose un major.
+on:
+  # Déclenche un bump automatique après un push sur dev ou main.
+  push:
+    branches:
+      - dev
+      - main
+
+  # Le bump major est volontairement manuel et demande une confirmation explicite.
+  workflow_dispatch:
+    inputs:
+      confirm_major:
+        description: Confirm creation of a major-version bump PR on main
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  # Nécessaire pour créer la branche et la pull request d'automatisation.
+  contents: write # Permission to write repository contents
+  pull-requests: write # Permission to create and update pull requests
+
+# Évite deux calculs/PR concurrents pour la même branche.
+concurrency:
+  group: monorepo-version-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Calculate and propose version bump
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test version bump script
+        run: node --test scripts/bump-version.test.cjs
+
+      - name: Detect version-only push
+        id: changes
+        if: github.event_name == 'push'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          # Le merge de la PR de bump ne doit pas déclencher une nouvelle PR de bump.
+          version_only="$(node scripts/bump-version.cjs --is-version-only "$BEFORE_SHA" "$HEAD_SHA")"
+          echo "skip=$version_only" >> "$GITHUB_OUTPUT"
+
+      - name: Bump root package version
+        id: bump
+        if: steps.changes.outputs.skip != 'true'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          CONFIRM_MAJOR: ${{ inputs.confirm_major }}
+        shell: bash
+        run: |
+          # Règle de versionnement: push dev = patch, push main = minor, dispatch main = major.
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$BRANCH_NAME" != "main" ]]; then
+              echo "Manual major bumps are allowed only from main."
+              exit 1
+            fi
+            if [[ "$CONFIRM_MAJOR" != "true" ]]; then
+              echo "Confirm the major bump in the workflow input."
+              exit 1
+            fi
+            bump_type="major"
+          elif [[ "$BRANCH_NAME" == "dev" ]]; then
+            bump_type="patch"
+          elif [[ "$BRANCH_NAME" == "main" ]]; then
+            bump_type="minor"
+          else
+            echo "Unsupported target branch: $BRANCH_NAME"
+            exit 1
+          fi
+
+          version="$(node scripts/bump-version.cjs "$bump_type")"
+          echo "type=$bump_type" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Proposing $bump_type bump to $version on $BRANCH_NAME."
+
+      - name: Open or update version bump pull request
+        if: steps.changes.outputs.skip != 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          # Le workflow propose une PR; il ne fusionne jamais la version automatiquement.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: ${{ github.ref_name }}
+          branch: automation/version-bump-${{ github.ref_name }}
+          delete-branch: true
+          title: "chore(version): bump ${{ steps.bump.outputs.type }} to ${{ steps.bump.outputs.version }}"
+          commit-message: "chore(version): bump ${{ steps.bump.outputs.type }} to ${{ steps.bump.outputs.version }}"
+          body: |
+            Automated ${{ steps.bump.outputs.type }} version bump for `${{ github.ref_name }}`.
+
+            The root `kgpay` package version is the monorepo release version.

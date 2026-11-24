@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>KG Pay - Page de déploiement</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;500;600&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0B3D2E;
+            --text: #F6F1E7;
+            --muted: rgba(246, 241, 231, .78);
+            --yellow: #E8B84B;
+            --bd: rgba(246, 241, 231, .22);
+            color-scheme: dark;
+            --ft: "Inter Tight", Inter, system-ui, sans-serif;
+            --fu: Inter, system-ui, sans-serif;
+            --fm: "IBM Plex Mono", ui-monospace, monospace
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font: 400 16px/24px var(--fu);
+            -webkit-font-smoothing: antialiased;
+            min-height: 100svh;
+            overflow-x: hidden
+        }
+
+        .stage {
+            min-height: 100svh;
+            display: grid;
+            grid-template-columns: 1.05fr .95fr;
+            align-items: center;
+            gap: 32px;
+            padding: calc(120px + env(safe-area-inset-top, 0px)) clamp(24px, 6vw, 96px) calc(96px + env(safe-area-inset-bottom, 0px));
+            position: relative
+        }
+
+        .brand {
+            position: absolute;
+            left: clamp(24px, 6vw, 96px);
+            top: calc(32px + env(safe-area-inset-top, 0px));
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font: 300 26px/1 var(--ft);
+            letter-spacing: -.02em
+        }
+
+        .brand b {
+            font-weight: 600
+        }
+
+        .mono {
+            font: 400 11px/1.6 var(--fm);
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            opacity: .72
+        }
+
+        h1 {
+            font: 300 clamp(40px, 5.6vw, 80px)/1.02 var(--ft);
+            letter-spacing: -.03em;
+            margin: 20px 0 24px;
+            max-width: 10em
+        }
+
+        h1 em {
+            font-style: normal;
+            font-weight: 500;
+            color: var(--yellow)
+        }
+
+        .lead {
+            color: var(--muted);
+            font-size: 18px;
+            line-height: 28px;
+            max-width: 28em
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            height: 36px;
+            padding: 0 16px 0 14px;
+            margin-top: 32px;
+            border: 1px solid var(--bd);
+            border-radius: 999px;
+            font: 500 14px var(--fu)
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--yellow);
+            animation: p 2s cubic-bezier(.2, .7, .2, 1) infinite
+        }
+
+        @keyframes p {
+            0% {
+                box-shadow: 0 0 0 0 rgba(232, 184, 75, .55)
+            }
+
+            100% {
+                box-shadow: 0 0 0 12px rgba(232, 184, 75, 0)
+            }
+        }
+
+        .art {
+            width: min(100%, 560px);
+            aspect-ratio: 1;
+            margin: 0 auto
+        }
+
+        .art svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible
+        }
+
+        .slow {
+            transform-origin: center;
+            animation: spin 300s linear infinite
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        footer {
+            position: absolute;
+            left: clamp(24px, 6vw, 96px);
+            right: clamp(24px, 6vw, 96px);
+            bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+            display: flex;
+            justify-content: space-between;
+            gap: 16px
+        }
+
+        @media(max-width:860px) {
+            .stage {
+                grid-template-columns: 1fr;
+                padding-top: 112px
+            }
+
+            .art {
+                width: min(78%, 340px);
+                order: -1
+            }
+
+            footer {
+                flex-direction: column;
+                gap: 4px
+            }
+        }
+
+        @media(prefers-reduced-motion:reduce) {
+
+            .dot,
+            .slow {
+                animation: none
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="stage">
+        <div class="brand" id="brand"></div>
+        <div class="art" id="art" aria-hidden="true"></div>
+        <section>
+            <p class="mono">Page de déploiement</p>
+            <h1>Ceci est la page de déploiement de <em>KG Pay.</em></h1>
+            <p class="lead">Si vous voyez cette page, le serveur répond. L’application sera servie à cette adresse.</p>
+            <p class="chip" role="status"><i class="dot"></i>Serveur en ligne</p>
+        </section>
+        <footer class="mono"><span>Kab Gateway Payment · CEMAC</span><span>Plusieurs sources. Un seul accès.</span>
+        </footer>
+    </main>
+    <script>
+        function kMark(uid, a, d, size) {
+            const W = 143, P = 185, G = 22, E = 1400, poly = (c1, c2, d1, d2) => [[c1, d1], [c2, d1], [c2, d2], [c1, d2]].map(([c, e]) => `${(c + e) / 2},${(c - e) / 2}`).join(' ');
+            const A = [0, 1, 2].map(k => [510 - P * k - W, 510 - P * k]), D = [0, 1, 2].map(k => [-P * k - W, -P * k]), cA = [], cD = [];
+            A.forEach(([a1, a2], ia) => D.forEach(([d1, d2], jd) => { (3 - ia + jd + 1) % 2 === 0 ? cD.push(poly(a1 - G, a2 + G, d1 - 6, d2 + 6)) : cA.push(poly(a1 - 6, a2 + 6, d1 - G, d2 + G)) }));
+            const m = (id, c) => `<mask id="${id}${uid}" maskUnits="userSpaceOnUse" x="-100" y="-100" width="720" height="720"><rect x="-100" y="-100" width="720" height="720" fill="#fff"/>${c.map(p => `<polygon points="${p}" fill="#000"/>`).join('')}</mask>`;
+            return `<svg width="${size}" height="${size}" viewBox="0 0 510 510" role="img" aria-label="KG Pay"><defs><clipPath id="c${uid}"><path d="M40 0H510L255 255L510 510H40A40 40 0 0 1 0 470V40A40 40 0 0 1 40 0Z"/></clipPath>${m('ma', cA)}${m('md', cD)}</defs><g clip-path="url(#c${uid})"><g fill="${a}" mask="url(#ma${uid})">${A.map(([x, y]) => `<polygon points="${poly(x, y, -E, E)}"/>`).join('')}</g><g fill="${d}" mask="url(#md${uid})">${D.map(([x, y]) => `<polygon points="${poly(-E, E, x, y)}"/>`).join('')}</g></g></svg>`
+        }
+        document.getElementById('brand').innerHTML = kMark('d', '#F6F1E7', '#E8B84B', 40) + '<span><b>KG</b> Pay</span>';
+        (function () {
+            const R = 300, m = 14, H = R * .3; let s = ''; for (let i = 0; i < 6; i++) { s += `<g transform="rotate(${i * 60})">`; for (let k = -m; k <= m; k++) { const h = k / m * H, c = 1 - Math.abs(k) / (m + 1), mid = k === 0; s += `<path d="M0 0C${R * .3} ${h} ${R * .7} ${h} ${R} 0" fill="none" stroke="${mid ? '#E8B84B' : '#F6F1E7'}" stroke-opacity="${mid ? .95 : (.1 + .5 * c).toFixed(2)}" stroke-width="${mid ? 1.6 : 1}"/>` } s += '</g>' }
+            document.getElementById('art').innerHTML = `<svg viewBox="${-R * 1.1} ${-R * 1.1} ${R * 2.2} ${R * 2.2}"><g class="slow">${s}</g><circle r="${R * 1.02}" fill="none" stroke="#F6F1E7" stroke-opacity=".12"/><circle r="6" fill="#E8B84B"/></svg>`
+        })();
+    </script>
+</body>
+
+</html>

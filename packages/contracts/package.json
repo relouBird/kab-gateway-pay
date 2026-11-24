@@ -1,0 +1,30 @@
+{
+  "name": "@kgpay/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./transport": {
+      "types": "./dist/transport.d.ts",
+      "default": "./dist/transport.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "oxlint --type-aware src/",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "oxlint": "^1.58.0",
+    "oxlint-tsgolint": "^7.0.2008",
+    "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "yup": "^1.7.1"
+  }
+}

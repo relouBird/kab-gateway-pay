@@ -1,0 +1,27 @@
+name: Deploy KG Pay to PlanetHoster
+
+# Entrée de production : déploiement automatique sur main ou relance manuelle.
+# Le premier déploiement réutilise aussi ce workflow avec mode=initialize.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      mode:
+        description: initialize ou deploy
+        required: false
+        type: string
+        default: deploy
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # Toute la construction et la publication sont centralisées dans le workflow partagé.
+    uses: ./.github/workflows/deploy-planet-host.yml
+    with:
+      mode: ${{ inputs.mode || 'deploy' }}
+    secrets: inherit

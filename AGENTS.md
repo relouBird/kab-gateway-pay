@@ -1,6 +1,6 @@
 # Instructions pour les agents — KG Pay
 
-> **Emplacement attendu :** racine du dépôt KG Pay, à côté du `README.md` développeur. Dans le dossier documentaire actuel, ce fichier est préparé sous `docs/` ; le déplacer à la racine avant de commencer les travaux de code. S'il s'y trouve déjà, poursuivre sans le déplacer à nouveau. Les chemins ci-dessous sont écrits relativement à son emplacement final.
+> **Emplacement :** racine du dépôt KG Pay, à côté du `README.md` développeur. Les chemins ci-dessous sont écrits relativement à cet emplacement.
 
 ## 1. Langue et mission
 
@@ -9,11 +9,11 @@
 - Travailler progressivement, cœur par cœur. Le premier cœur est **Cœur 1 — Identité et contrôle des accès** (`auth-service`, `CDC-01`).
 - Lire le README développeur à la racine, puis les documents requis ci-dessous avant toute tâche. Respecter les consignes plus spécifiques éventuellement présentes dans des `AGENTS.md` imbriqués.
 
-## 2. État réel du projet au 21 novembre 2026
+## 2. État réel du projet au 22 novembre 2026
 
-- Le dossier disponible à la création de ces consignes contient la documentation ; **le monorepo applicatif KG Pay, son dépôt Git, son code source et ses manifests ne sont pas encore créés**.
-- Il n'existe donc pas encore de commandes applicatives exécutables, de dépendances installables, de pipeline, de hooks Husky ni de déploiement à inspecter. Ne pas déclarer ces éléments présents.
-- Le CDC-01 est le premier CDC, version 0.1, et reste un brouillon pour validation. ADR-001 et ADR-002 sont des documents proposés ; leurs propositions non validées ne sont pas des décisions acquises.
+- Le dépôt Git local, le remote `origin` et le workspace pnpm/Turborepo sont initialisés ; `main` est la branche principale, `dev` la branche d'intégration, et les branches de travail partent de `dev`.
+- `services/auth-service` implémente les parcours backend du CDC-01. Les tests unitaires existent ; la recette avec base de données, SMTP et parcours HTTP complets reste à exécuter. Le frontend KG Pay, la CI et le déploiement ne sont pas créés.
+- Le CDC-01 est validé comme base V1 avec ses points ouverts conservés. Un OTP par e-mail après le mot de passe est confirmé pour `CUSTOMER` et `STAFF` à chaque nouvelle connexion. L'envoi de développement passe par SMTP configurable (Maildev) ; la disponibilité/sécurité de la boîte e-mail est un risque résiduel. Les paramètres OTP et la récupération restent à préciser.
 - `nexus-gate-web` est la seule référence frontend/auth fournie. C'est un projet distinct avec son propre contexte : ses appels, rôles, parcours d'équipe/`CREATOR` et choix de sécurité ne sont pas les contrats de KG Pay.
 - `master/` contient des références PDF/Word administratives : **ne pas l'explorer ni s'en servir comme source** sauf demande explicite du porteur du projet.
 - Ne pas ouvrir ou parcourir `node_modules`, les fichiers `.env`/secrets, ni les sorties générées telles que `dist/`, sauf demande explicite et nécessité démontrée. Préférer `.env.example` sans secrets.
@@ -56,7 +56,7 @@ Respecter les invariants du README documentaire, en particulier :
 
 Sécurité générale :
 
-- Ne jamais ajouter de secret aux fichiers versionnés, exemples, journaux, événements, captures, commits ou messages d'erreur.
+- Ne jamais ajouter de secret aux fichiers versionnés, exemples, journaux, événements, captures, commits ou messages d'erreur. Le `.env` racine local est ignoré par Git ; ne jamais le committer.
 - Ne jamais journaliser mots de passe, OTP/MFA, cookies, tokens, objets de requête Axios complets ou données personnelles/financières non nécessaires.
 - Le frontend n'est jamais une frontière d'autorisation : le backend contrôle identité, permissions, propriété de ressource et règles métier.
 - Les services n'accèdent pas aux bases des autres services ; aucun import d'un service vers un autre.
@@ -65,8 +65,9 @@ Sécurité générale :
 ## 5. Règles actuelles du cœur 1
 
 - Le cœur 1 gère identités, sessions, MFA, rôles/permissions et accès ; il ne porte pas le dossier KYC ni la décision de validation client, qui relèvent du cœur 2.
-- **MFA obligatoire pour tous les sujets** est une orientation confirmée par le porteur du projet. TOTP est proposé pour le personnel ; le facteur client, son enrôlement et sa récupération restent à arbitrer. Ne pas ouvrir d'accès privilégié sans MFA, même si sa livraison est découpée.
-- La liste proposée des rôles internes est `OPERATIONS_ADMIN`, `CONFIGURATION_ADMIN`, `SECURITY_ADMIN` ; elle reste à valider avec les permissions exactes. `SECURITY_ADMIN` administre les identités mais n'est pas un superutilisateur métier et ne reçoit pas des droits par héritage.
+- **MFA obligatoire pour tous les sujets** est confirmé par mot de passe puis OTP e-mail à chaque nouvelle connexion. Ne pas ouvrir de session complète ni d'accès privilégié avant validation du code. Un OTP e-mail est moins indépendant qu'un authenticator et sa récupération doit être définie.
+- Seul l'e-mail est un identifiant vérifié ; le téléphone n'est qu'un contact non vérifié. La perte d'accès à l'e-mail CUSTOMER relève du support, jamais d'un OTP envoyé au téléphone.
+- Les rôles intégrés sont `CUSTOMER`, `GLOBAL_SUPER_ADMIN`, `OPERATIONS_ADMIN` et `CONFIGURATION_ADMIN`. Le super-admin gère identités, sécurité, attribution des rôles et rôles personnalisés composés depuis un catalogue fermé ; il dispose de toutes les permissions du catalogue. RP-10 s'applique sans exception : il ne peut pas approuver une demande qu'il a demandée ou instruite.
 - La fenêtre UI de deux secondes est un délai avant envoi HTTP pour les actions explicitement déclarées annulables. L'annulation avant envoi signifie qu'aucune requête ne part ; après envoi, le résultat dépend de la réponse serveur. Cela ne retarde pas une désactivation urgente.
 - Une suppression logique via `deletedAt` dépend du CDC du domaine ; les journaux d'audit et écritures comptables immuables ne sont pas supprimés.
 
@@ -87,7 +88,7 @@ Sécurité générale :
 3. Pour chaque incertitude bloquante, poser une question ciblée avant d'implémenter. Ne pas combler silencieusement les points ouverts.
 4. Faire des changements précis, cohérents frontend/backend si le parcours le nécessite, et mettre à jour le CDC/ADR lié lorsque l'exigence ou une décision change.
 5. Ajouter des tests ciblés pour le comportement modifié ; exécuter les scripts existants les plus étroits qui couvrent la modification. Ne pas prétendre avoir testé une commande absente.
-6. Ne pas installer de dépendances tant qu'un manifest n'existe pas ou qu'un outil requis ne manque pas pour une validation prévue. Les dépendances de chaque app/package résident dans son manifest ; le lockfile est généré par le gestionnaire choisi.
+6. Ne pas installer de dépendances tant qu'un manifest n'existe pas ou qu'un outil requis ne manque pas pour une validation prévue. Les dépendances de chaque app/package résident dans son manifest ; le lockfile est généré par le gestionnaire choisi. Garder les commandes opérateur ciblées par workspace dans le `package.json` racine, et les tâches standards `build`, `dev`, `lint`, `typecheck`, `test` ainsi que leurs lifecycle hooks dans chaque workspace pour Turbo.
 7. Ajouter au journal la date, le CDC ou l'ADR, les actions/fichiers, les validations réellement exécutées, les questions restantes et la prochaine étape.
 8. Terminer par un résumé concis des résultats, validations et blocages.
 

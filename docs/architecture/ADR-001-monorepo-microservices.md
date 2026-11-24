@@ -28,7 +28,7 @@ Enseignement tiré d'un projet précédent (NexusGate) : plusieurs services part
 | D3 | **Pas d'`api-gateway` applicatif.** Chaque service expose sa propre API HTTP. Un reverse proxy (Nginx ou Traefik) peut router les chemins vers les services, mais c'est de l'infrastructure : aucun code métier n'y réside. | [DÉCISION] pas de gateway · [PROPOSITION] reverse proxy infra optionnel |
 | D4 | **Une base par service** (instance ou base logique distincte). Un schéma Prisma **par service**, aucun package Prisma partagé. Aucune requête SQL d'un service vers la base d'un autre. | [PROPOSITION] |
 | D5 | **Packages partagés strictement techniques** (voir §4). Aucun modèle de domaine, aucun accès base, aucune règle métier dans un package partagé. | [DÉCISION] packages partagés · [PROPOSITION] périmètre |
-| D6 | **`global.env` partagé uniquement au build** (voir §5). À l'exécution, un service ne lit que ses propres variables. | [DÉCISION] |
+| D6 | **Une source locale `.env` à la racine**, filtrée et transformée par workspace selon son schéma ; les sorties de build et runtime sont distinctes et générées. À l'exécution, un service ne lit que ses propres variables (voir §5). | [DÉCISION] |
 | D7 | **Communication entre services : événements asynchrones** avec Transactional Outbox. Les appels HTTP synchrones inter-services sont l'exception et doivent être justifiés dans le CDC du cœur concerné. Broker recommandé : RabbitMQ, à confirmer au premier événement inter-services réel. | [PROPOSITION] |
 | D8 | **Authentification inter-services stateless** : JWT signés en asymétrique, clé publique exposée par JWKS par `auth-service`, vérification locale par un guard partagé. | [PROPOSITION] |
 | D9 | **Création progressive** : un service n'est créé dans `services/` que lorsque le CDC de son cœur est validé. | [PROPOSITION] |
@@ -47,8 +47,12 @@ kgpay/
 │   └── cdc/
 │       └── CDC-01-identite-acces.md
 ├── apps/                         # interfaces web (proposition ADR-002)
-├── env/
-│   └── global.env                # variables NON secrètes partagées au build
+├── .env                          # source unique locale, ignorée par Git
+├── .env.example                  # modèle sans secrets
+├── .generated/
+│   └── env/
+│       ├── auth-service.build.env
+│       └── auth-service.runtime.env
 ├── packages/                     # packages partagés (techniques)
 │   ├── config/                   # @kgpay/config
 │   ├── contracts/                # @kgpay/contracts
@@ -59,11 +63,10 @@ kgpay/
 │   └── auth-service/             # cœur 1 (premier service)
 │       ├── src/
 │       ├── prisma/schema.prisma  # propre à ce service
-│       ├── service.env           # variables propres non secrètes
-│       ├── env.schema.ts         # variables attendues et clés partagées autorisées
+│       ├── env.schema.json       # contrat des variables attendues et partagées
 │       └── Dockerfile
 ├── scripts/
-│   └── build-env.ts              # fusion global.env + service.env au build
+│   └── generate-env.cjs         # génération filtrée par workspace et usage
 ├── pnpm-workspace.yaml
 └── turbo.json
 ```
@@ -80,28 +83,41 @@ kgpay/
 
 **Règle de dépendance** : `services/*` et `apps/*` peuvent dépendre de `packages/*`. `packages/*` ne dépend jamais de `services/*` ni de `apps/*`. `services/*` ne dépend jamais d'un autre `services/*` ou d'une application. Ces règles sont vérifiées automatiquement (dependency-cruiser ou règle ESLint équivalente) dans la CI.
 
-## 5. Mécanisme `global.env` (partage au build uniquement)
+## 5. Source unique et génération des environnements
 
-**Objectif :** définir une fois les valeurs communes, sans qu'un service les lise ensuite depuis un fichier partagé.
+**Objectif :** maintenir un seul fichier d'environnement éditable, tout en ne donnant à chaque service, application ou package que les variables qu'il déclare. Les fichiers générés sont des sorties par cible, pas des configurations supplémentaires à maintenir.
 
-**Fichiers**
+**Fichiers et emplacement**
 
-- `env/global.env` : variables **non secrètes** communes (versionné). Exemples : `LOG_LEVEL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL`, `BROKER_HOST`, `DEFAULT_CURRENCY`.
-- `services/<service>/service.env` : variables propres non secrètes (versionné).
-- Secrets (clés privées, mots de passe de base, `BROKER_URL` avec identifiants) : **jamais dans ces fichiers**. Ils sont injectés par l'orchestrateur ou le gestionnaire de secrets au déploiement, et par un `.env.local` ignoré par Git en développement.
+- `.env` à la racine : source locale unique, ignorée par Git. Elle peut contenir des secrets runtime ; elle ne doit jamais être committée.
+- `.env.example` à la racine : modèle versionné, sans credentials ni vraies clés. Il documente les noms de variables et les valeurs locales non secrètes.
+- `services/<service>/env.schema.json`, `apps/<app>/env.schema.json` ou `packages/<package>/env.schema.json` : contrat de variables du workspace. Le schéma conserve `properties`, `requiredKeys`, `sharedKeys`, `forbiddenKeys` et `forbiddenKeyPatterns`, et peut déclarer `targetPrefix`, `runtimeOnlyKeys` et `runtimeRequiredKeys`.
+- `.generated/env/<workspace>.build.env` : sortie temporaire au build, contenant uniquement les variables autorisées au build.
+- `.generated/env/<workspace>.runtime.env` : sortie temporaire au lancement/migration, contenant les variables nécessaires à ce workspace, y compris les secrets runtime autorisés.
 
-**Déroulé**
+Exemple pour le dépôt actuel :
 
-1. Chaque service déclare dans `env.schema.ts` la liste de ses variables et, parmi elles, celles qu'il accepte d'hériter de `global.env` (`sharedKeys`).
-2. `pnpm env:build` exécute `scripts/build-env.ts` : pour chaque service, il fusionne `global.env` (limité aux `sharedKeys`) et `service.env`, puis écrit un fichier généré dans le dossier de build du service (ex. `dist/build.env`).
-3. Au démarrage, le service charge `build.env`, puis les variables d'environnement réelles (secrets, surcharges), valide le tout avec `@kgpay/config` et **refuse de démarrer** si une variable manque ou est invalide.
-4. Après le build, plus rien ne lit `env/global.env`.
+```text
+kgpay/
+├── .env
+├── .env.example
+├── .generated/env/
+│   ├── auth-service.build.env
+│   └── auth-service.runtime.env
+└── services/auth-service/env.schema.json
+```
 
-**Règles**
+Le `.env` racine est la seule source modifiée à la main. Les noms `GLOBAL__<KEY>` alimentent les clés marquées `sharedKeys` ; les autres clés utilisent le suffixe de cible, par exemple `DATABASE_URL__AUTH_SERVICE`. Le générateur valide les clés, les types, les valeurs requises et les clés non reconnues, puis retire le suffixe de source pour produire les clés que le code cible attend (`DATABASE_URL`, `PORT`, etc.). Une valeur présente dans l'environnement du processus a priorité sur celle du fichier racine.
 
-- Une variable absente de `sharedKeys` n'est jamais copiée dans un service.
-- Une valeur de `service.env` l'emporte sur `global.env` ; une variable d'environnement réelle l'emporte sur les deux.
-- Toute nouvelle variable est ajoutée au schéma, à l'exemple (`*.example`) et au README du service dans la même modification.
+**Séparation build/runtime**
+
+1. `pnpm env:build` génère un fichier `.build.env` par workspace qui déclare un schéma. Les tâches Turbo `build` déclenchent cette génération avant de lancer les builds ; le build direct d'un workspace fait de même.
+2. `runtimeOnlyKeys` exclut explicitement les credentials et clés privées de toute sortie de build. Une URL de base contenant un mot de passe, les clés HMAC/JWT, les credentials SMTP et les secrets de clients internes ne sont donc pas copiés dans `dist`, les caches de build ou les bundles frontend.
+3. `pnpm env:runtime` génère les `.runtime.env` par workspace. Turbo le lance avant `dev` ; un démarrage ou une migration ciblée génère aussi la sortie propre au service concerné.
+4. `auth-service` charge uniquement `.generated/env/auth-service.runtime.env` au démarrage. `run-prisma.cjs` génère puis charge ce même fichier avant la commande Prisma. En production, la même source unique peut être injectée de manière sécurisée avant génération ; elle n'est jamais incluse dans l'artefact compilé.
+5. Les deux sorties résident sous `.generated/env/` à la racine du dépôt, sont ignorées par Git et ne sont pas copiées dans `dist`. Elles peuvent être régénérées à tout moment depuis `.env`.
+
+Les noms suffixés permettent de stocker dans un seul `.env` les valeurs de services ou d'applications ayant le même nom de variable sans collision. Les packages partagés n'ont pas d'environnement par défaut : une librairie reçoit sa configuration par le service ou l'application qui l'utilise ; une cible dédiée ne sera ajoutée que si un besoin de build réel l'exige.
 
 ## 6. Découpage des cœurs en services [PROPOSITION]
 
@@ -149,3 +165,4 @@ Basé sur l'hypothèse du référentiel v0.3 §8.1, précisé pour des services 
 | --- | --- | --- |
 | 1 — Identité et accès | 20 nov. 2026 | Création de l'ADR. Choix D8 (JWT asymétrique + JWKS) induit par l'absence de gateway. |
 | Bootstrap du dépôt | 21 nov. 2026 | Le porteur valide pnpm workspaces et Turborepo ; le dépôt Git local est initialisé sur `main` avec `dev` comme branche d'intégration. |
+| Cœur 1 — backend | 22 nov. 2026 | Une source locale unique `.env` à la racine, filtrée selon les schémas de workspace vers `.generated/env/<workspace>.build.env` et `.runtime.env`. Les secrets restent runtime-only ; les démarrages PostgreSQL et Maildev locaux ou Docker sont documentés. Le relay local d'outbox n'impose pas de broker. |
