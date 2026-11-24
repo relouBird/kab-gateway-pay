@@ -127,7 +127,7 @@ Issus du référentiel v0.3 (§2, §6.1, règles RP) :
 
 ## 7. Variables d'environnement
 
-Le dépôt maintient une seule source locale éditable : `.env` à la racine. Elle est ignorée par Git et n'est jamais chargée directement par un service. `.env.example` décrit les noms attendus sans contenir de secrets ; le `.env` réel doit être fourni localement ou injecté de manière sécurisée sur l'hôte de déploiement.
+Par défaut, la source locale est `.env` à la racine. Des profils locaux comme `.env.test` et `.env.prod` peuvent aussi être conservés ; ils sont ignorés par Git et sélectionnés explicitement par les commandes qui acceptent `--env-file`. Ne jamais copier un profil par-dessus `.env` pour changer d'environnement. Aucun fichier `.env` n'est chargé directement par un service. `.env.example` décrit les noms attendus sans contenir de secrets ; le profil réel doit être fourni localement ou placé de manière sécurisée sur l'hôte de déploiement.
 
 Les clés communes prennent la forme `GLOBAL__<KEY>` ; les clés propres à un workspace utilisent un suffixe qui identifie leur cible (par exemple `DATABASE_URL__AUTH_SERVICE`, `VITE_AUTH_API_URL__CUSTOMER_PORTAL`). Le générateur retire ce préfixe/suffixe pour écrire le nom que le code cible attend. Un `env.schema.json` conserve `properties`, `requiredKeys` et `sharedKeys`, et déclare aussi `targetPrefix`, `runtimeOnlyKeys` et `runtimeRequiredKeys`.
 
@@ -137,7 +137,7 @@ Les sorties sont centralisées et ignorées dans `.generated/env/`, à la racine
 - `.generated/env/auth-service.runtime.env` contient la configuration runtime nécessaire à `auth-service`, secrets inclus. Il est lu au démarrage ou par les commandes Prisma, n'est pas copié dans `dist` et ne doit pas être publié.
 - Lorsqu'une future application ou un futur service déclare son `env.schema.json`, le générateur produit les mêmes fichiers avec son nom de workspace (`<workspace>.build.env` et `<workspace>.runtime.env`). Les packages partagés n'ont pas d'environnement par défaut ; leur configuration leur est passée par le consommateur.
 
-`pnpm env:build` et `pnpm env:runtime` génèrent les sorties de tous les workspaces déclarant un schéma. Les tâches Turbo `build` et `dev` les déclenchent avant leur orchestration ; les scripts ciblés d'un workspace régénèrent aussi ses fichiers lorsqu'il est démarré ou buildé seul. Les variables déjà injectées dans le processus gardent la priorité sur les valeurs du `.env`.
+`pnpm env:build` et `pnpm env:runtime` génèrent les sorties de tous les workspaces déclarant un schéma. Les tâches Turbo `build` et `dev` les déclenchent avant leur orchestration ; les scripts ciblés d'un workspace régénèrent aussi ses fichiers lorsqu'il est démarré ou buildé seul. Les variables déjà injectées dans le processus gardent la priorité sur les valeurs du `.env`. Lorsqu'un `--source-file` explicite est sélectionné, ce fichier est prioritaire et un `--output-dir` temporaire peut éviter d'écrire les sorties dans le dépôt.
 
 ## 8. Commandes disponibles et cibles
 
@@ -175,7 +175,9 @@ pnpm db:auth-service:migrate:deploy
 
 Les commandes racine fournissent les alias ciblés par workspace, par exemple `build:customer-portal`, `build:staff-portal`, `dev:staff-portal`, `lint:staff-portal`, `typecheck:staff-portal` et `test:staff-portal`, ainsi que les commandes d'`auth-service`. Les scripts `build`, `dev`, `lint`, `typecheck` et `test` restent dans le manifest de chaque workspace car Turbo les appelle directement.
 
-Pour `auth-service`, copier `.env.example` vers `.env`, renseigner l'URL PostgreSQL et les clés runtime, puis démarrer avec `pnpm start:auth-service`. Le générateur ciblé est également exécuté automatiquement par les commandes de démarrage et de migration.
+Pour `auth-service`, fournir une configuration locale puis démarrer avec `pnpm start:auth-service`. Le générateur ciblé est également exécuté automatiquement par les commandes de démarrage et de migration. La commande `pnpm db:auth-service:migrate:deploy -- --env-file .env.test` sélectionne explicitement un profil pour une migration locale ; sans option, elle utilise toujours `.env`.
+
+Les workflows PlanetHoster et la configuration requise sont décrits dans le [README développeur](../README.md#builds-et-opérations-planethoster) et l'ADR-002. Les migrations de production sont manuelles et distinctes du dépôt des builds. Le profil de production sur l'hôte reste hors du dépôt, hors de la racine publique et hors de l'arbre d'artefacts ; aucune copie de `.env.prod` vers `.env` n'est faite.
 
 En développement/test, `/docs` expose Swagger UI et `/docs-json` le contrat OpenAPI exploitable par un outil ou un agent. Une collection Postman couvrant les opérations documentées est disponible dans [`services/auth-service/collections/auth-service.postman_collection.json`](../services/auth-service/collections/auth-service.postman_collection.json).
 

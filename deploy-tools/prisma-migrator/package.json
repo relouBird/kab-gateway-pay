@@ -1,0 +1,24 @@
+{
+  "name": "kgpay-prisma-migrator",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Standalone npm utility for deploying KG Pay Prisma migrations",
+  "scripts": {
+    "migrate:deploy": "node migrate.cjs",
+    "test": "node --test migrate.test.cjs"
+  },
+  "dependencies": {
+    "dotenv": "16.4.7",
+    "prisma": "6.19.3"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2",
+      "effect": "3.22.1"
+    }
+  },
+  "allowScripts": {
+    "prisma@6.19.3": true,
+    "@prisma/engines@6.19.3": true
+  }
+}
