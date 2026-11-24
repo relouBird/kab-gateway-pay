@@ -43,7 +43,7 @@ export const fr = {
     },
     otp: {
       required: "Saisissez le code reçu par e-mail.",
-      invalid: "Le code doit contenir de 6 à 10 chiffres.",
+      invalid: "Le code doit contenir exactement 6 chiffres.",
     },
     password: {
       required: "Saisissez un mot de passe.",
@@ -81,7 +81,8 @@ export const fr = {
   },
   otp: {
     code: "Code de vérification",
-    codeHint: "Code à usage unique reçu par e-mail.",
+    codeHint: "Saisissez les 6 chiffres reçus par e-mail ou collez le code.",
+    digitPosition: "{{label}} — chiffre {{current}} sur {{total}}",
     resend: "Renvoyer le code",
     resendIn_one: "Renvoyer le code ({{count}} seconde)",
     resendIn_other: "Renvoyer le code ({{count}} secondes)",
@@ -250,18 +251,15 @@ export const fr = {
       eyebrow: "Hors connexion",
       title: "Plus de réseau pour le moment.",
       message:
-        "Votre appareil n’est plus connecté à Internet. Dès que le réseau revient, vous pourrez reprendre.",
+        "Votre appareil n’est plus connecté à Internet. Rétablissez le réseau pour continuer.",
     },
     restored: {
       eyebrow: "Connexion rétablie",
       title: "De retour. Tout est en place.",
       message:
-        "Votre connexion fonctionne de nouveau. Rechargez la page pour continuer en toute sécurité.",
+        "La connexion est rétablie. Rechargez la page pour continuer ; aucune requête n’est relancée automatiquement.",
       action: "Recharger la page",
     },
-    paymentTitle: "Un paiement était en cours ?",
-    paymentNote:
-      "Il a peut-être abouti avant la coupure. Ne le relancez pas avant d’avoir consulté son suivi.",
     waiting: "En attente du réseau…",
   },
 };

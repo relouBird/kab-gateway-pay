@@ -10,7 +10,7 @@ import { OtpResend } from "../auth/OtpResend";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { Notice } from "../ui/Notice";
-import { TextField } from "../ui/TextField";
+import { OtpInput } from "../ui/OtpInput";
 
 interface StepUpPanelProps {
   action: string;
@@ -32,6 +32,7 @@ export function StepUpPanel({
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [resendAvailableAt, setResendAvailableAt] = useState(0);
   const form = useYupForm({ formId, schema: otpFormSchema, initialValues });
+  const codeField = form.field("code");
   const request = useSubmit();
   const confirm = useSubmit("code");
 
@@ -99,14 +100,14 @@ export function StepUpPanel({
                 {t(confirm.error.key)}
               </Notice>
             ) : null}
-            <TextField
-              {...form.field("code")}
+            <OtpInput
+              id={codeField.id}
               label={t("otp.code")}
+              value={codeField.value}
+              onChange={(value) => form.setFieldValue("code", value)}
               hint={t("stepUp.codeHint")}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              spellCheck={false}
-              className="field--code"
+              error={codeField.error}
+              disabled={confirm.pending}
             />
             <div className="actions">
               <Button

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { maskEmail } from "../../../stores/otpFlowStore";
+import { OtpInput } from "../../../components/ui/OtpInput";
 
 export function RecoveryDialog({
   challengeId,
@@ -73,24 +74,24 @@ export function RecoveryDialog({
             className="stack"
             onSubmit={(event) => {
               event.preventDefault();
+              if (code.length !== 6) return;
               onVerify(code);
             }}
           >
             <p>{t("otpDescription", { email: maskEmail(email ?? "") })}</p>
-            <label className="field">
-              <span>{t("otp")}</span>
-              <input
-                autoComplete="one-time-code"
-                inputMode="numeric"
-                maxLength={10}
-                onChange={(e) => setCode(e.target.value)}
-                pattern="[0-9]{6,10}"
-                required
-                value={code}
-              />
-            </label>
+            <OtpInput
+              id="recovery-code"
+              label={t("otp")}
+              value={code}
+              onChange={setCode}
+              hint={t("otpHint")}
+            />
             <div className="actions">
-              <button className="button button--primary" type="submit">
+              <button
+                className="button button--primary"
+                disabled={code.length !== 6}
+                type="submit"
+              >
                 {t("verify")}
               </button>
               <button

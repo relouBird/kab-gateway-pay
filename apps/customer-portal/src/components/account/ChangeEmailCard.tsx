@@ -10,6 +10,7 @@ import { useYupForm } from "../../composables/useYupForm";
 import { authService } from "../../services/authService";
 import { Button } from "../ui/Button";
 import { Notice } from "../ui/Notice";
+import { OtpInput } from "../ui/OtpInput";
 import { TextField } from "../ui/TextField";
 import { StepUpPanel } from "./StepUpPanel";
 
@@ -34,6 +35,7 @@ export function ChangeEmailCard() {
     schema: otpFormSchema,
     initialValues: codeValues,
   });
+  const codeField = codeForm.field("code");
   const request = useSubmit("emailChange");
   const verify = useSubmit("emailChangeCode");
 
@@ -142,14 +144,14 @@ export function ChangeEmailCard() {
               {t(verify.error.key)}
             </Notice>
           ) : null}
-          <TextField
-            {...codeForm.field("code")}
+          <OtpInput
+            id={codeField.id}
             label={t("otp.code")}
+            value={codeField.value}
+            onChange={(value) => codeForm.setFieldValue("code", value)}
             hint={t("otp.codeHint")}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            spellCheck={false}
-            className="field--code"
+            error={codeField.error}
+            disabled={verify.pending}
           />
           <div className="actions">
             <Button

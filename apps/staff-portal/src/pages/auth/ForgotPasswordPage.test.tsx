@@ -47,10 +47,11 @@ describe("ForgotPasswordPage", () => {
       screen.getByRole("button", { name: /envoyer un code/i }),
     );
 
-    await userEvent.type(
-      await screen.findByLabelText(/code de sécurité/i),
-      "123456",
-    );
+    const firstOtpCell = await screen.findByRole("textbox", {
+      name: /chiffre 1 sur 6/i,
+    });
+    await userEvent.click(firstOtpCell);
+    await userEvent.paste("123456");
     await userEvent.type(
       screen.getByLabelText(/nouveau mot de passe/i),
       "correct-horse-1",

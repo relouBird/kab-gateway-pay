@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router";
-import {
-  ConnectionPage,
-  type ConnectionPageState,
-} from "./pages/ConnectionPage";
+import { ConnectionRestoredPage } from "./pages/ConnectionRestoredPage";
+import { OfflinePage } from "./pages/OfflinePage";
 import { appRoutes } from "./routes/appRoutes";
 import { restoreSession } from "./services/sessionManager";
 
@@ -12,7 +10,7 @@ const router = createBrowserRouter(appRoutes);
 export function App() {
   const [started, setStarted] = useState(false);
   const [connectionState, setConnectionState] = useState<
-    "connected" | ConnectionPageState
+    "connected" | "offline" | "restored"
   >(() => (navigator.onLine ? "connected" : "offline"));
 
   useEffect(() => {
@@ -41,16 +39,15 @@ export function App() {
     void restoreSession().finally(() => setStarted(true));
   }, []);
 
-  if (connectionState !== "connected") {
+  if (connectionState === "offline")
     return (
-      <ConnectionPage
-        state={connectionState}
+      <OfflinePage
         onRetry={() =>
           setConnectionState(navigator.onLine ? "restored" : "offline")
         }
       />
     );
-  }
+  if (connectionState === "restored") return <ConnectionRestoredPage />;
 
   return started ? <RouterProvider router={router} /> : null;
 }

@@ -6,7 +6,7 @@ import { useSubmit } from "../../composables/useSubmit";
 import { useYupForm } from "../../composables/useYupForm";
 import { Button } from "../ui/Button";
 import { Notice } from "../ui/Notice";
-import { TextField } from "../ui/TextField";
+import { OtpInput } from "../ui/OtpInput";
 import { OtpResend } from "./OtpResend";
 
 interface OtpChallengeViewProps {
@@ -33,6 +33,7 @@ export function OtpChallengeView({
 }: OtpChallengeViewProps) {
   const { t } = useTranslation();
   const form = useYupForm({ formId, schema: otpFormSchema, initialValues });
+  const codeField = form.field("code");
   const { pending, error, run } = useSubmit("code");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -54,15 +55,14 @@ export function OtpChallengeView({
             {t(error.key)}
           </Notice>
         ) : null}
-        <TextField
-          {...form.field("code")}
+        <OtpInput
+          id={codeField.id}
           label={t("otp.code")}
+          value={codeField.value}
+          onChange={(value) => form.setFieldValue("code", value)}
           hint={t("otp.codeHint")}
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          autoCapitalize="off"
-          spellCheck={false}
-          className="field--code"
+          error={codeField.error}
+          disabled={pending}
         />
         <Button
           type="submit"
