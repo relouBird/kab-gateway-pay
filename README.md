@@ -89,6 +89,28 @@ La configuration locale a une seule source éditable à la racine (`.env`, ignor
 - La CI doit compléter les hooks locaux ; un hook ne remplace pas les suites de tests ou la revue.
 - Ne pas ajouter des hooks, scripts ou fichiers de configuration qui prétendent valider sans lancer de vérification effective.
 
+## Versionnement
+
+La version racine de `package.json` est la version commune du monorepo KG Pay ; les versions de workspace ne sont pas modifiées par ce mécanisme. Le workflow `Bump monorepo version` propose une PR de bump après un push sur `dev` (patch) ou `main` (minor). Un lancement manuel depuis `main`, avec confirmation, propose un major bump. Les merges de PR de version seule ne déclenchent pas un nouveau bump.
+
+Le script `node scripts/bump-version.cjs <patch|minor|major>` modifie uniquement le champ `version` du `package.json` racine. Le workflow exécute ses tests ciblés avant de proposer la PR. Le workflow de dépôt effectue un build, mais il n'existe pas encore de CI générale lint/typecheck/tests ; ces validations ciblées ne remplacent pas une CI complète.
+
+## Builds et opérations PlanetHoster
+
+Le workflow `Build and deposit KG Pay artifacts` construit les workspaces sur un runner GitHub avec pnpm, sur `dev` et `main`. Il dépose un artefact immuable sous `builds/<SHA>` dans un répertoire privé configuré par `SERVER_DEPLOY_ROOT`. L'arborescence des workspaces est conservée (`apps/customer-portal/dist`, `apps/staff-portal/dist`, `services/auth-service/dist`, packages compilés et migrations Prisma). Ce n'est pas encore un déploiement des portails ni un paquet runtime complet pour démarrer `auth-service` : aucun domaine public n'est modifié et aucun service n'est redémarré.
+
+Pour les portails, Vite intègre le code des packages utilisés dans les fichiers statiques ; le serveur web n'a donc pas besoin de `node_modules`. À l'inverse, `services/auth-service/dist` seul ne contient pas les dépendances NestJS/Prisma : son installation npm runtime et son mécanisme de démarrage/rechargement restent à concevoir avant de l'exécuter sur PH.
+
+Créer les environnements GitHub `test` et `production`, chacun avec les variables publiques `CUSTOMER_AUTH_API_URL` et `STAFF_AUTH_API_URL`. Les valeurs sont incorporées aux builds Vite ; elles ne doivent contenir aucun secret. La création de `.env` dans le runner part de `.env.example`, jamais de `.env.prod`. Le dépôt PH est facultatif tant que `SERVER_DEPLOY_ROOT` n'est pas défini ; lorsqu'il l'est, ce chemin doit être absolu et hors de toute racine web publique.
+
+Pour le dépôt SSH, configurer dans l'environnement GitHub les secrets `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_SSH_KNOWN_HOSTS` et, si nécessaire, `SERVER_SSH_PORT` (défaut `5022`), ainsi que la variable `SERVER_DEPLOY_ROOT`. Les clés d'hôte doivent être vérifiées hors bande et enregistrées dans `SERVER_SSH_KNOWN_HOSTS` ; le workflow n'utilise pas `ssh-keyscan` à la volée.
+
+Le workflow manuel `Apply auth-service production migrations` est distinct des builds et ne s'exécute jamais sur un push. Il exige un SHA complet d'un artefact `main`, une confirmation de sauvegarde restaurable, et l'environnement GitHub `production` (à configurer avec approbation obligatoire). Il active l'environnement Node de `deploy`, installe le petit outil npm autonome, puis exécute uniquement `prisma migrate deploy`. Il ne prend pas lui-même la sauvegarde et ne redémarre pas l'API.
+
+Sur l'hôte, renseigner `SERVER_NODE_ENV_ACTIVATE` et `SERVER_PRODUCTION_ENV_FILE` dans l'environnement GitHub `production`. Ce dernier doit désigner un fichier privé, lisible par l'utilisateur de déploiement, situé hors de `SERVER_DEPLOY_ROOT` et de toute racine web, contenant au minimum `DATABASE_URL__AUTH_SERVICE`. Le migrateur lit cette clé sans afficher sa valeur et la passe au processus Prisma ; il ne copie pas le fichier et ne remplace jamais `.env`. Ne pas envoyer les fichiers locaux `.env.test` ou `.env.prod` à GitHub ou au sous-domaine.
+
+En local, les profils peuvent être sélectionnés explicitement sans écraser `.env`, par exemple `pnpm db:auth-service:migrate:deploy -- --env-file .env.test`. Sans cette option, la commande existante continue d'utiliser `.env`. L'exécution sur PH et l'accessibilité de la base doivent être vérifiées avant une migration de production.
+
 ## Documentation et journal de travail
 
 - Les référentiels métier vivent dans `docs/`, les décisions d'architecture dans `docs/architecture/`, les cahiers des charges par cœur dans `docs/cdc/`.

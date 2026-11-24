@@ -1,0 +1,215 @@
+name: Build and deposit KG Pay artifacts
+
+on:
+  # push:
+  #   branches:
+  #     - dev
+  #     - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kgpay-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build revision artifacts
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'test' }}
+    env:
+      GLOBAL__NODE_ENV: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+      VITE_AUTH_API_URL__CUSTOMER_PORTAL: ${{ vars.CUSTOMER_AUTH_API_URL }}
+      VITE_AUTH_API_URL__STAFF_PORTAL: ${{ vars.STAFF_AUTH_API_URL }}
+
+    steps:
+      - name: Validate target branch
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_NAME" != "dev" && "$GITHUB_REF_NAME" != "main" ]]; then
+            echo "Builds can run only from dev or main."
+            exit 1
+          fi
+
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test npm-only Prisma utility
+        run: |
+          npm ci --omit=dev --prefix deploy-tools/prisma-migrator
+          npm test --prefix deploy-tools/prisma-migrator
+
+      - name: Build all workspaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          trap 'rm -f .env; rm -rf .generated/env' EXIT
+          pnpm run build
+
+      - name: Package immutable revision artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/kgpay-release"
+          archive="$RUNNER_TEMP/kgpay-build.tar.gz"
+          mkdir -p "$release_dir"
+
+          for workspace_root in apps packages services; do
+            if [[ -d "$workspace_root" ]]; then
+              while IFS= read -r -d '' dist_dir; do
+                relative_parent="$(dirname "$dist_dir")"
+                mkdir -p "$release_dir/$relative_parent"
+                cp -a "$dist_dir" "$release_dir/$relative_parent/"
+              done < <(find "$workspace_root" -type d -name dist -prune -print0)
+            fi
+          done
+
+          mkdir -p "$release_dir/services/auth-service"
+          cp -a services/auth-service/prisma "$release_dir/services/auth-service/"
+          mkdir -p "$release_dir/deploy-tools/prisma-migrator"
+          cp deploy-tools/prisma-migrator/package.json \
+            deploy-tools/prisma-migrator/package-lock.json \
+            deploy-tools/prisma-migrator/migrate.cjs \
+            "$release_dir/deploy-tools/prisma-migrator/"
+
+          test -f "$release_dir/apps/customer-portal/dist/index.html"
+          test -f "$release_dir/apps/staff-portal/dist/index.html"
+          test -f "$release_dir/services/auth-service/prisma/migrations/migration_lock.toml"
+
+          node - "$release_dir" <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const releaseDir = process.argv[2];
+          const manifest = {
+            commit: process.env.GITHUB_SHA,
+            ref: process.env.GITHUB_REF_NAME,
+            version: require('./package.json').version,
+          };
+          fs.writeFileSync(
+            path.join(releaseDir, 'manifest.json'),
+            `${JSON.stringify(manifest, null, 2)}\n`,
+          );
+          NODE
+
+          tar -C "$release_dir" -czf "$archive" .
+
+      - name: Save GitHub artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kgpay-build-${{ github.sha }}
+          path: ${{ runner.temp }}/kgpay-build.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+
+  deposit:
+    name: Deposit revision on PlanetHoster
+    needs: build
+    if: vars.SERVER_DEPLOY_ROOT != ''
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'test' }}
+
+    steps:
+      - name: Download GitHub artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kgpay-build-${{ github.sha }}
+          path: ${{ runner.temp }}/kgpay-artifact
+
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_SSH_KNOWN_HOSTS: ${{ secrets.SERVER_SSH_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SERVER_SSH_KEY"
+          test -n "$SERVER_SSH_KNOWN_HOSTS"
+          printf '%s\n' "$SERVER_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$SERVER_SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+          chmod 600 "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/known_hosts"
+
+      - name: Upload revision to private build directory
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT || '5022' }}
+          SERVER_DEPLOY_ROOT: ${{ vars.SERVER_DEPLOY_ROOT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SERVER_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "$SERVER_USER" =~ ^[A-Za-z0-9._-]+$ ]]
+          [[ "$SERVER_SSH_PORT" =~ ^[0-9]+$ ]]
+          [[ "$SERVER_DEPLOY_ROOT" =~ ^/[A-Za-z0-9._/-]+$ ]]
+          [[ "$SERVER_DEPLOY_ROOT" != *".."* ]]
+          test "$SERVER_SSH_PORT" -ge 1
+          test "$SERVER_SSH_PORT" -le 65535
+
+          archive="$RUNNER_TEMP/kgpay-artifact/kgpay-build.tar.gz"
+          test -f "$archive"
+          remote="$SERVER_USER@$SERVER_HOST"
+          archive_name="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
+          printf -v prepare_command 'bash -s -- %q' "$SERVER_DEPLOY_ROOT"
+          ssh -i "$RUNNER_TEMP/deploy_key" \
+            -p "$SERVER_SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$RUNNER_TEMP/known_hosts" \
+            "$remote" "$prepare_command" <<'REMOTE'
+          set -eu
+          root="$1"
+          mkdir -p "$root/incoming" "$root/builds"
+          REMOTE
+
+          scp -i "$RUNNER_TEMP/deploy_key" \
+            -P "$SERVER_SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$RUNNER_TEMP/known_hosts" \
+            "$archive" "$remote:$SERVER_DEPLOY_ROOT/incoming/$archive_name"
+
+          printf -v deposit_command 'bash -s -- %q %q %q %q' \
+            "$SERVER_DEPLOY_ROOT" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$archive_name"
+          ssh -i "$RUNNER_TEMP/deploy_key" \
+            -p "$SERVER_SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$RUNNER_TEMP/known_hosts" \
+            "$remote" "$deposit_command" <<'REMOTE'
+          set -eu
+          root="$1"
+          revision="$2"
+          run_id="$3"
+          archive_name="$4"
+          archive="$root/incoming/$archive_name"
+          staging="$root/builds/.incoming-$revision-$run_id"
+          release="$root/builds/$revision"
+
+          test -f "$archive"
+          test ! -e "$release"
+          mkdir "$staging"
+          trap 'rm -rf -- "$staging"' EXIT
+          tar -xzf "$archive" -C "$staging"
+          test -f "$staging/manifest.json"
+          mv "$staging" "$release"
+          trap - EXIT
+          rm -f -- "$archive"
+          echo "Deposited revision $revision."
+          REMOTE

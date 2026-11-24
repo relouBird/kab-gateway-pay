@@ -79,3 +79,37 @@ Consigner l'implémentation des états de connectivité et de saisie OTP dans le
 
 - La longueur OTP frontend est six ; conserver `OTP_LENGTH=6` côté backend ou aligner les portails avant tout changement de configuration.
 - La recette utilisateur et les autres validations de production listées ci-dessus restent indépendantes de cette livraison.
+
+## Mise à jour — builds centralisés et utilitaires PlanetHoster
+
+### Objectif et statut
+
+Consigner le processus de build centralisé, le dépôt privé d'artefacts par SHA et la migration manuelle via Node/npm sur le sous-domaine `deploy`. **Implémentation locale terminée ; compatibilité réelle de l'hébergement mutualisé à valider.**
+
+### Résumé des changements
+
+- D13 confirme que GitHub Actions construit avec pnpm et dépose les artefacts hors de la racine publique ; les portails statiques ne requièrent pas Node à l'exécution.
+- Le dépôt d'artefacts et les migrations sont deux workflows distincts. La migration exige un SHA `main`, une confirmation de sauvegarde et l'environnement GitHub `production`, et n'exécute que `prisma migrate deploy`.
+- Le profil de production reste sur l'hôte, hors dépôt et répertoire de déploiement. La sélection est explicite ; aucun `.env.prod` n'est copié vers `.env`.
+- Les artefacts n'incluent ni `.env`, ni `node_modules`, ni toutes les dépendances runtime d'`auth-service`; le démarrage/rechargement du service et la publication des portails ne sont pas encore automatisés.
+
+### Chemins modifiés
+
+- `.github/workflows/build-artifacts.yml`, `.github/workflows/migrate-auth-service.yml`
+- `deploy-tools/prisma-migrator/`
+- `scripts/generate-env.cjs`, `scripts/generate-env.test.cjs`, `scripts/run-prisma.cjs`, `scripts/run-prisma.test.cjs`, `package.json`
+- `README.md`, `docs/README.md`, `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`
+
+### Validations
+
+- Tests ciblés des scripts et du migrateur : 16 réussis.
+- Installation npm du migrateur et tests ciblés : réussis ; `npm audit --omit=dev` : 0 vulnérabilité.
+- `prisma validate` du schéma `auth-service` avec une URL synthétique : réussi.
+- Prettier et `git diff --check` : réussis.
+- Les workflows distants et le build complet des workspaces n'ont pas été exécutés dans cette session.
+
+### Points ouverts et suite attendue
+
+- Configurer les variables d'URL API, les secrets SSH et empreintes d'hôtes, le répertoire privé, l'environnement Node `deploy` et le chemin du fichier d'environnement de production.
+- Vérifier sur PH la version Node, l'accès réseau à npm et PostgreSQL, et la sauvegarde/restauration d'une base de test.
+- Déposer un build `dev`, vérifier sa structure, puis exécuter une migration sur une base isolée avant toute action de production.

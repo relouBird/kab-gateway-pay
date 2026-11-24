@@ -34,7 +34,7 @@
     "typecheck:auth-service": "turbo run typecheck --filter=auth-service",
     "typecheck:customer-portal": "turbo run typecheck --filter=customer-portal",
     "typecheck:staff-portal": "turbo run typecheck --filter=staff-portal",
-    "test": "node --test scripts/generate-env.test.cjs && turbo run test",
+    "test": "node --test scripts/generate-env.test.cjs scripts/run-prisma.test.cjs scripts/bump-version.test.cjs && turbo run test",
     "test:auth-service": "pnpm --filter auth-service test",
     "test:customer-portal": "pnpm --filter customer-portal test",
     "test:staff-portal": "pnpm --filter staff-portal test",
