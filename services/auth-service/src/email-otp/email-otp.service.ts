@@ -15,7 +15,7 @@ export class EmailOtpService {
   async send(input: SendOtpEmailInput): Promise<void> {
     const template = createOtpEmailTemplate(input);
     await this.transport.sendMail({
-      from: this.from,
+      from: `"KG Pay, Support" <${this.from}>`,
       to: input.to,
       ...template,
     });

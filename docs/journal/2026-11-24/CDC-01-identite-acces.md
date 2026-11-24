@@ -117,3 +117,14 @@ Séparer les états introuvable, hors ligne et réseau rétabli dans les deux po
 
 - La saisie frontend est fixée à six chiffres tandis que le backend permet `OTP_LENGTH` de 1 à 10 (défaut 6). Garder la configuration à six, ou aligner les deux portails avant de modifier cette valeur.
 - La recette manuelle CDC-01 reste à poursuivre à RC1-108 ; l'implémentation des pages ne vaut pas validation utilisateur ni recette complète.
+
+## Mise à jour — expéditeur des courriels OTP
+
+- **Objectif :** corriger l'échec du test OTP après l'ajout d'un nom d'expéditeur contenant une virgule.
+- **Statut :** terminé localement.
+- **Résumé :** le nom affiché `KG Pay, Support` est désormais encadré selon le format d'adresse de courriel, sans modifier l'adresse SMTP configurée. Le test vérifie l'adresse avec son nom affiché.
+- **Chemins modifiés :** `services/auth-service/src/email-otp/email-otp.service.ts`, `services/auth-service/src/email-otp/email-otp.service.spec.ts`, `docs/journal/2026-11-24/CDC-01-identite-acces.md`.
+- **Exigences concernées :** CDC-01, courriels OTP d'identité; aucune règle fonctionnelle modifiée.
+- **Validations :** suite `auth-service` — 30 tests réussis; Prettier sur les deux fichiers de code — réussi; `git diff --check` — réussi.
+- **Points ouverts :** aucun sur ce correctif; le build GitHub signalant une valeur `SMTP_FROM` invalide reste un problème distinct de configuration du secret de production.
+- **Suite attendue :** relancer le hook pre-commit.

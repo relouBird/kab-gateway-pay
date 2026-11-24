@@ -32,7 +32,7 @@ describe('EmailOtpService', () => {
 
     expect(sentMessages).toHaveLength(1);
     expect(sentMessages.at(0)).toMatchObject({
-      from: 'no-reply@kgpay.local',
+      from: '"KG Pay, Support" <no-reply@kgpay.local>',
       to: 'customer@example.com',
       subject: 'Votre code de sécurité KG Pay',
       text: expect.stringContaining('pour vous connecter à votre compte'),
