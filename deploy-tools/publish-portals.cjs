@@ -24,6 +24,24 @@ function isWithin(parent, child) {
   );
 }
 
+function resolvePotentialPath(target) {
+  let current = target;
+  const missingSegments = [];
+  while (!fs.existsSync(current)) {
+    const parent = path.dirname(current);
+    if (parent === current) {
+      fail(`Cannot resolve portal destination path: ${target}`);
+    }
+    missingSegments.unshift(path.basename(current));
+    current = parent;
+  }
+  return path.join(fs.realpathSync(current), ...missingSegments);
+}
+
+function pathsOverlap(left, right) {
+  return left === right || isWithin(left, right) || isWithin(right, left);
+}
+
 function normalizePermissions(directory) {
   const entry = fs.lstatSync(directory);
   if (entry.isSymbolicLink()) {
@@ -109,6 +127,15 @@ function publishPortals({ sourceRoot, targetRoot }) {
     isWithin(targetDirectory, sourceDirectory)
   ) {
     fail("Portal source and target paths must be separate.");
+  }
+  const releaseSnapshotDirectory = fs.realpathSync(
+    path.dirname(sourceDirectory),
+  );
+  const resolvedTargetDirectory = resolvePotentialPath(targetDirectory);
+  if (pathsOverlap(releaseSnapshotDirectory, resolvedTargetDirectory)) {
+    fail(
+      "Portal destination must be physically separate from the temporary release directory.",
+    );
   }
   if (targetDirectory === path.parse(targetDirectory).root) {
     fail("The portal target root cannot be a filesystem root.");

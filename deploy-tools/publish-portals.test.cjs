@@ -121,3 +121,25 @@ test("rejects incomplete builds without replacing existing portals", (t) => {
     "current",
   );
 });
+
+test("rejects a portal target aliased into the temporary release through a symlink", (t) => {
+  const temp = createTempDirectory(t);
+  const sourceRoot = path.join(temp, "deploy", "dist", "apps");
+  const targetAlias = path.join(temp, "portal-target-alias");
+  const targetRoot = path.join(targetAlias, "kgapps");
+  createBuild(sourceRoot);
+  fs.symlinkSync(
+    path.dirname(sourceRoot),
+    targetAlias,
+    process.platform === "win32" ? "junction" : "dir",
+  );
+
+  assert.throws(
+    () => publishPortals({ sourceRoot, targetRoot }),
+    /physically separate from the temporary release directory/,
+  );
+  assert.equal(
+    fs.existsSync(path.join(path.dirname(sourceRoot), "kgapps")),
+    false,
+  );
+});
