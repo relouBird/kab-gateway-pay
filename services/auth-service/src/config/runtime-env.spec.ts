@@ -1,8 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { jest as jestApi } from '@jest/globals';
-import { loadRuntimeEnvironment } from './runtime-env';
+import {
+  loadRuntimeEnvironment,
+  resolveRuntimeEnvironmentFile,
+} from './runtime-env';
 
 describe('loadRuntimeEnvironment', () => {
   it('loads the configured runtime environment file', () => {
@@ -26,6 +29,35 @@ describe('loadRuntimeEnvironment', () => {
       } else {
         process.env.RUNTIME_ENV_FILE = previousPath;
       }
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('finds the runtime environment beside a packaged service runtime', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'kgpay-packaged-runtime-'));
+    const moduleDirectory = join(
+      directory,
+      'auth-service',
+      'runtime',
+      'dist',
+      'config',
+    );
+    const runtimeEnvFile = join(
+      directory,
+      'auth-service',
+      '.generated',
+      'env',
+      'auth-service.runtime.env',
+    );
+
+    mkdirSync(dirname(runtimeEnvFile), { recursive: true });
+    writeFileSync(runtimeEnvFile, 'NODE_ENV=production\n');
+
+    try {
+      expect(resolveRuntimeEnvironmentFile(undefined, moduleDirectory)).toBe(
+        runtimeEnvFile,
+      );
+    } finally {
       rmSync(directory, { recursive: true, force: true });
     }
   });

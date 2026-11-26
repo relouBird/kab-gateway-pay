@@ -83,3 +83,21 @@
   - Initialisation PlanetHoster depuis `test` — en attente.
 - **Points ouverts :** publier la correction sur `test` et confirmer la première initialisation sans toucher aux répertoires de production.
 - **Suite attendue :** valider les tests/syntaxes, puis relancer l'initialisation de l'environnement test.
+
+## Entrée du 26 novembre 2026 — Résolution du runtime empaqueté Passenger
+
+- **Objectif :** retrouver le fichier runtime privé de `auth-service` lors du démarrage Passenger du paquet déployé sous `runtime/`.
+- **Statut :** correctif local en attente de validation et de déploiement sur test.
+- **Résumé :**
+  - Le fichier est installé sous `$SERVER_AUTH_SERVICE_APP_ROOT/.generated/env/auth-service.runtime.env`, tandis que le runtime compilé se trouve sous `$SERVER_AUTH_SERVICE_APP_ROOT/runtime/dist/`.
+  - Sans `RUNTIME_ENV_FILE` effectivement injecté dans l'environnement Passenger, l'ancien chemin relatif remontait trop loin dans l'arborescence du paquet et ne trouvait pas le fichier.
+  - Le chargeur cherche maintenant le runtime adjacent à l'APP_ROOT du paquet, tout en conservant le chemin explicite `RUNTIME_ENV_FILE` comme priorité et le chemin du dépôt pour les exécutions locales.
+  - La documentation distingue désormais une variable d'environnement Passenger d'une valeur écrite dans un `.env` séparé ou dans le secret GitHub `KG_PAY_APP_ENV`.
+- **Fichiers modifiés :** `services/auth-service/src/config/runtime-env.ts`, `services/auth-service/src/config/runtime-env.spec.ts`, `services/auth-service/README.md`, `README.md`, `docs/journal/2026-11-26/BASE.md`.
+- **Référence :** ADR-001 §5 (séparation et chargement des environnements runtime), CDC-01 §11.12 (démarrage avec les seules variables runtime).
+- **Validations exécutées :**
+  - `pnpm --filter auth-service exec node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand src/config/runtime-env.spec.ts` — 2 tests réussis.
+  - `pnpm exec prettier --check` sur les fichiers modifiés — réussi.
+  - `git diff --check` — réussi.
+- **Points ouverts :** confirmer que le fichier runtime existe et est lisible dans l'APP_ROOT test, puis redémarrer Passenger après publication du correctif.
+- **Suite attendue :** valider le test unitaire ciblé et le formatage, publier la correction sur `test`, puis vérifier le démarrage sans exposer les valeurs du fichier runtime.
