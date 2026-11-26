@@ -6,6 +6,7 @@ const { execFileSync } = require("node:child_process");
 
 const MAX_RELEASES = 5;
 const RELEASE_ID_PATTERN = /^\d{8}T\d{6}Z$/;
+const DEPLOYMENT_REFS = new Set(["main", "test"]);
 
 function fail(message) {
   throw new Error(message);
@@ -54,7 +55,7 @@ function validateArchiveEntries(entries) {
   return normalized;
 }
 
-function readManifest(releaseDir) {
+function readManifest(releaseDir, expectedRef) {
   let manifest;
   try {
     manifest = JSON.parse(
@@ -64,11 +65,16 @@ function readManifest(releaseDir) {
     fail(`Cannot read release manifest: ${error.message}`);
   }
 
+  if (!DEPLOYMENT_REFS.has(expectedRef)) {
+    fail("The expected deployment branch must be main or test.");
+  }
   if (!manifest || !/^[0-9a-f]{40}$/i.test(manifest.commit)) {
     fail("The release manifest must contain a full commit identifier.");
   }
-  if (manifest.ref !== "main") {
-    fail("Only artifacts built from main can be promoted to PlanetHoster.");
+  if (manifest.ref !== expectedRef) {
+    fail(
+      `The artifact branch ${manifest.ref} does not match the deployment branch ${expectedRef}.`,
+    );
   }
   if (typeof manifest.version !== "string" || !manifest.version) {
     fail("The release manifest must contain a version.");
@@ -83,8 +89,8 @@ function assertFile(rootDir, relativePath) {
   }
 }
 
-function validateReleaseDirectory(releaseDir) {
-  const manifest = readManifest(releaseDir);
+function validateReleaseDirectory(releaseDir, expectedRef) {
+  const manifest = readManifest(releaseDir, expectedRef);
   for (const relativePath of [
     "apps/customer-portal/dist/index.html",
     "apps/customer-portal/dist/favicon.svg",
@@ -164,7 +170,8 @@ function parseArguments(args) {
     if (
       option !== "--archive" &&
       option !== "--deploy-root" &&
-      option !== "--commit"
+      option !== "--commit" &&
+      option !== "--ref"
     ) {
       fail(`Unknown option ${option}.`);
     }
@@ -177,11 +184,19 @@ function parseArguments(args) {
     ] = value;
     index += 1;
   }
-  if (!options.archive || !options.deployRoot || !options.commit) {
-    fail("--archive, --deploy-root, and --commit are required.");
+  if (
+    !options.archive ||
+    !options.deployRoot ||
+    !options.commit ||
+    !options.ref
+  ) {
+    fail("--archive, --deploy-root, --commit, and --ref are required.");
   }
   if (!/^[0-9a-f]{40}$/i.test(options.commit)) {
     fail("--commit must be a full 40-character commit identifier.");
+  }
+  if (!DEPLOYMENT_REFS.has(options.ref)) {
+    fail("--ref must be main or test.");
   }
   return options;
 }
@@ -190,6 +205,7 @@ function applyRelease({
   archive,
   deployRoot,
   expectedCommit,
+  expectedRef = "main",
   now = new Date(),
 }) {
   if (
@@ -254,7 +270,7 @@ function applyRelease({
     execFileSync("tar", ["-xzf", path.resolve(archive), "-C", stagingDir], {
       stdio: "inherit",
     });
-    const manifest = validateReleaseDirectory(stagingDir);
+    const manifest = validateReleaseDirectory(stagingDir, expectedRef);
     if (
       !/^[0-9a-f]{40}$/i.test(expectedCommit) ||
       manifest.commit.toLowerCase() !== expectedCommit.toLowerCase()
@@ -324,8 +340,15 @@ function applyRelease({
 }
 
 function main() {
-  const { archive, deployRoot, commit } = parseArguments(process.argv.slice(2));
-  const result = applyRelease({ archive, deployRoot, expectedCommit: commit });
+  const { archive, deployRoot, commit, ref } = parseArguments(
+    process.argv.slice(2),
+  );
+  const result = applyRelease({
+    archive,
+    deployRoot,
+    expectedCommit: commit,
+    expectedRef: ref,
+  });
   console.log(
     `Installed ${result.releaseId} from ${result.manifest.ref} (${result.manifest.version}); ` +
       `${result.retainedReleaseIds.length} dated releases retained.`,

@@ -64,3 +64,22 @@
   - Run GitHub Actions et initialisation PlanetHoster — en attente.
 - **Points ouverts :** vérifier qu'aucun clone/release n'existe déjà sous `<SERVER_DEPLOY_ROOT>/test`; l'initialisation ne doit jamais réutiliser la racine de production.
 - **Suite attendue :** vérifier la syntaxe et les tests ciblés, puis relancer le workflow test avec `initialize`.
+
+## Entrée du 26 novembre 2026 — Promotion contrôlée des releases test
+
+- **Objectif :** permettre la promotion d'une release construite depuis `test` vers sa racine PlanetHoster isolée sans autoriser son déploiement en production.
+- **Statut :** correction locale terminée ; publication sur la branche test et nouvelle initialisation en attente.
+- **Résumé :**
+  - Le run `45817105429` a atteint l'initialisation de la racine test mais le gestionnaire de releases refusait tout manifeste dont `ref` n'était pas `main`.
+  - L'erreur était cohérente avec l'ancien garde-fou de production, mais ce garde-fou ne distinguait pas la racine/environnement ciblé.
+  - Le déploiement transmet désormais la branche attendue au gestionnaire; celui-ci accepte seulement `main` ou `test` et exige que `manifest.ref` égale la branche cible, en plus de vérifier le commit complet.
+- **Fichiers modifiés :** `deploy-tools/release-manager.cjs`, `deploy-tools/release-manager.test.cjs`, `deploy-tools/planet-host-deploy.sh`, `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`, `docs/journal/2026-11-26/BASE.md`.
+- **Conventions concernées :** séparation production/test; validation de la branche et du commit avant promotion d'une release.
+- **Validations exécutées :**
+  - `node --test deploy-tools/release-manager.test.cjs` — 7 tests réussis, dont acceptation de `test` et rejet d'un manifeste sur la mauvaise branche.
+  - `bash -n deploy-tools/planet-host-deploy.sh` — réussi.
+  - `pnpm exec prettier --check` sur les scripts et documents modifiés — réussi.
+  - `git diff --check` — réussi.
+  - Initialisation PlanetHoster depuis `test` — en attente.
+- **Points ouverts :** publier la correction sur `test` et confirmer la première initialisation sans toucher aux répertoires de production.
+- **Suite attendue :** valider les tests/syntaxes, puis relancer l'initialisation de l'environnement test.
