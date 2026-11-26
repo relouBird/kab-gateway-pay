@@ -282,9 +282,9 @@ jobs:
             echo "::error::SERVER_DEPLOY_ROOT must be a non-root absolute path."
             exit 1
           fi
-          # if [[ "$DEPLOY_ENVIRONMENT" == "test" ]]; then
-          #   SERVER_DEPLOY_ROOT="${SERVER_DEPLOY_ROOT%/}/test"
-          # fi
+          if [[ "$DEPLOY_ENVIRONMENT" == "test" ]]; then
+            SERVER_DEPLOY_ROOT="${SERVER_DEPLOY_ROOT%/}/test"
+          fi
           export SERVER_DEPLOY_ROOT
           bash deploy-tools/deploy-release.sh
 

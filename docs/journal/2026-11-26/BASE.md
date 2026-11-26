@@ -45,3 +45,22 @@
   - Exécution du workflow et démarrage sur PlanetHoster — en attente.
 - **Points ouverts :** exécuter une nouvelle release et vérifier que le marqueur confirme les smoke tests dans le conteneur, puis que le runtime publié charge `argon2` sur PH.
 - **Suite attendue :** relancer le déploiement avec cette correction; ne pas considérer le run précédent comme preuve de compatibilité GLIBC.
+
+## Entrée du 26 novembre 2026 — Racine cohérente pour le déploiement test
+
+- **Objectif :** corriger l'échec de l'initialisation test où le runtime d'`auth-service` était absent du répertoire `incoming`.
+- **Statut :** correction locale terminée ; workflow test à relancer.
+- **Résumé :**
+  - Le run `45815027390` était en mode `initialize` sur la branche/environnement `test`. L'étape Upload ajoutait `/test` à `SERVER_DEPLOY_ROOT`, mais cette transformation était commentée dans Apply.
+  - Le fichier runtime était donc envoyé sous `<SERVER_DEPLOY_ROOT>/test/incoming/`, tandis que le script distant le cherchait dans `<SERVER_DEPLOY_ROOT>/incoming/`.
+  - La transformation `/test` est rétablie dans Apply pour garder les deux phases sur la même racine et séparer les fichiers de test de la production.
+- **Fichiers modifiés :** `.github/workflows/deploy-planet-host.yml`, `docs/journal/2026-11-26/BASE.md`.
+- **Conventions concernées :** isolement des racines `production` et `test`; transfert et application d'une même release.
+- **Validations exécutées :**
+  - `bash -n` sur les scripts upload, deploy et remote deploy — réussi.
+  - `pnpm exec prettier --check .github/workflows/deploy-planet-host.yml docs/journal/2026-11-26/BASE.md` — réussi.
+  - `git diff --check` — réussi.
+  - `node --test deploy-tools/release-manager.test.cjs deploy-tools/publish-portals.test.cjs` — 8 tests réussis.
+  - Run GitHub Actions et initialisation PlanetHoster — en attente.
+- **Points ouverts :** vérifier qu'aucun clone/release n'existe déjà sous `<SERVER_DEPLOY_ROOT>/test`; l'initialisation ne doit jamais réutiliser la racine de production.
+- **Suite attendue :** vérifier la syntaxe et les tests ciblés, puis relancer le workflow test avec `initialize`.
