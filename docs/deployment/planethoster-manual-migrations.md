@@ -85,7 +85,7 @@ set -e
 AUTH_APP_ROOT="/chemin/absolu/privé/auth-service"
 source "/chemin/absolu/nodevenv/auth-service/22/bin/activate"
 set -u
-export KG_PAY_RUNTIME_ENV_FILE="$AUTH_APP_ROOT/.generated/env/auth-service.runtime.env"
+export RUNTIME_ENV_FILE="$AUTH_APP_ROOT/.generated/env/auth-service.runtime.env"
 cd "$AUTH_APP_ROOT/runtime"
 test -s dist/cli/bootstrap-super-admin.js
 node dist/cli/bootstrap-super-admin.js
