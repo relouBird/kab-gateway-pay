@@ -14,7 +14,10 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-docker run --rm --pull=always --platform linux/amd64 \
+verification_marker="$release_dir/.argon2-glibc-2.28-verified"
+rm -f -- "$verification_marker"
+
+docker run --interactive --rm --pull=always --platform linux/amd64 \
   --env "HOST_UID=$(id -u)" \
   --env "HOST_GID=$(id -g)" \
   --mount "type=bind,source=$release_dir,target=/release" \
@@ -102,5 +105,16 @@ const argon2 = require("argon2");
 });
 NODE
 
+printf 'node=%s;glibc=2.28;argon2-build=verified\n' "$node_version" \
+  > /release/.argon2-glibc-2.28-verified
+chown "${HOST_UID:?}:${HOST_GID:?}" /release/.argon2-glibc-2.28-verified
 echo "argon2 built from source and verified on GLIBC 2.28."
 CONTAINER
+
+expected_marker="node=22.23.5;glibc=2.28;argon2-build=verified"
+if [[ ! -f "$verification_marker" ||
+  "$(cat "$verification_marker")" != "$expected_marker" ]]; then
+  echo "::error::The GLIBC 2.28 argon2 build did not produce its verification marker."
+  exit 1
+fi
+rm -f -- "$verification_marker"
