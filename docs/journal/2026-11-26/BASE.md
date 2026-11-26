@@ -101,3 +101,21 @@
   - `git diff --check` — réussi.
 - **Points ouverts :** confirmer que le fichier runtime existe et est lisible dans l'APP_ROOT test, puis redémarrer Passenger après publication du correctif.
 - **Suite attendue :** valider le test unitaire ciblé et le formatage, publier la correction sur `test`, puis vérifier le démarrage sans exposer les valeurs du fichier runtime.
+
+## Entrée du 26 novembre 2026 — Moteur Prisma compatible PlanetHoster
+
+- **Objectif :** inclure dans les releases le Query Engine Prisma requis par l'environnement PlanetHoster (`debian-openssl-1.1.x`).
+- **Statut :** correction locale en validation ; une nouvelle release test est nécessaire.
+- **Résumé :**
+  - Le run `20261126T133845Z` a généré le client Prisma sur le runner avec son moteur OpenSSL 3, alors que le Node.js du serveur détecte `debian-openssl-1.1.x`.
+  - Le schéma Prisma demande maintenant les moteurs `native` et `debian-openssl-1.1.x`.
+  - Le workflow échoue à la construction si le moteur cible PlanetHoster n'est pas présent dans le runtime empaqueté.
+- **Fichiers modifiés :** `services/auth-service/prisma/schema.prisma`, `.github/workflows/deploy-planet-host.yml`, `README.md`, `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`, `docs/journal/2026-11-26/BASE.md`.
+- **Conventions concernées :** génération Prisma du runtime d'`auth-service`; compatibilité du binaire natif avec l'OpenSSL du serveur.
+- **Validations exécutées :**
+  - `pnpm --filter auth-service exec prisma generate --schema=prisma/schema.prisma` avec une URL synthétique — réussi.
+  - Vérification ciblée du dossier client généré — `libquery_engine-debian-openssl-1.1.x.so.node` présent.
+  - `pnpm exec prettier --check` sur le workflow et les documents modifiés — réussi.
+  - `git diff --check` — réussi.
+- **Points ouverts :** produire puis démarrer une release test sur PlanetHoster; ne pas relancer la release courante sans inclure ce nouveau moteur.
+- **Suite attendue :** valider que le moteur `debian-openssl-1.1.x` est généré et empaqueté, puis publier le correctif sur `test` et redéployer.
