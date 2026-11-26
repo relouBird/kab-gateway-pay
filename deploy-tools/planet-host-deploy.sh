@@ -194,7 +194,8 @@ fi
   node "$manager" \
     --archive "$archive" \
     --deploy-root "$root" \
-    --commit "$expected_commit"
+    --commit "$expected_commit" \
+    --ref "$target_branch"
 )
 
 if [ ! -d "$runtime_source" ]; then

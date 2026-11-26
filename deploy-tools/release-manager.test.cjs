@@ -9,6 +9,7 @@ const test = require("node:test");
 const {
   applyRelease,
   createReleaseId,
+  parseArguments,
   validateArchiveEntries,
 } = require("./release-manager.cjs");
 
@@ -17,11 +18,12 @@ function createReleaseArchive(
   rootDir,
   commit = "a".repeat(40),
   omittedFiles = [],
+  ref = "main",
 ) {
   const sourceDir = path.join(rootDir, "source");
   const archive = path.join(rootDir, "incoming.tar.gz");
   const files = {
-    "manifest.json": JSON.stringify({ commit, ref: "main", version: "0.0.1" }),
+    "manifest.json": JSON.stringify({ commit, ref, version: "0.0.1" }),
     "apps/customer-portal/dist/index.html": "<html>customer</html>",
     "apps/customer-portal/dist/favicon.svg": "<svg />",
     "apps/staff-portal/dist/index.html": "<html>staff</html>",
@@ -138,6 +140,66 @@ test("release promotion keeps a dated history and atomically updates dist", (t) 
       path.join(deployRoot, "local-builds", result.releaseId, ".env"),
     ),
     false,
+  );
+});
+
+test("release promotion accepts test artifacts only for the test branch", (t) => {
+  const tempDir = createTempDirectory(t);
+  const commit = "a".repeat(40);
+  const archive = createReleaseArchive(t, tempDir, commit, [], "test");
+
+  const result = applyRelease({
+    archive,
+    deployRoot: path.join(tempDir, "test-planet-host"),
+    expectedCommit: commit,
+    expectedRef: "test",
+  });
+
+  assert.equal(result.manifest.ref, "test");
+  assert.throws(
+    () =>
+      applyRelease({
+        archive,
+        deployRoot: path.join(tempDir, "production-planet-host"),
+        expectedCommit: commit,
+        expectedRef: "main",
+      }),
+    /does not match the deployment branch main/,
+  );
+});
+
+test("release manager requires an allowed deployment ref", () => {
+  assert.deepEqual(
+    parseArguments([
+      "--archive",
+      "release.tar.gz",
+      "--deploy-root",
+      "/home/deploy",
+      "--commit",
+      "a".repeat(40),
+      "--ref",
+      "test",
+    ]),
+    {
+      archive: "release.tar.gz",
+      deployRoot: "/home/deploy",
+      commit: "a".repeat(40),
+      ref: "test",
+    },
+  );
+  assert.throws(
+    () =>
+      parseArguments([
+        "--archive",
+        "release.tar.gz",
+        "--deploy-root",
+        "/home/deploy",
+        "--commit",
+        "a".repeat(40),
+        "--ref",
+        "dev",
+      ]),
+    /--ref must be main or test/,
   );
 });
 
