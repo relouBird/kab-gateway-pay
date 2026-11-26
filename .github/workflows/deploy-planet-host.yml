@@ -97,7 +97,8 @@ jobs:
           for script in \
             deploy-tools/upload-release.sh \
             deploy-tools/deploy-release.sh \
-            deploy-tools/planet-host-deploy.sh; do
+            deploy-tools/planet-host-deploy.sh \
+            deploy-tools/build-argon2-for-planethoster.sh; do
             bash -n "$script"
           done
 
@@ -161,6 +162,8 @@ jobs:
           pnpm --filter auth-service deploy --prod --legacy \
             "$release_dir/services/auth-service"
 
+          bash deploy-tools/build-argon2-for-planethoster.sh "$release_dir"
+
           (
             cd "$release_dir/services/auth-service"
             test ! -e .env
@@ -170,6 +173,7 @@ jobs:
             node -e "
               require('@kgpay/contracts');
               require('@nestjs/core');
+              require('argon2');
               const { PrismaClient } = require('@prisma/client');
               if (typeof PrismaClient !== 'function') process.exit(1);
             "
