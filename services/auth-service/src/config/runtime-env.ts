@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 export function loadRuntimeEnvironment(): void {
-  const configuredRuntimeEnv = process.env.KG_PAY_RUNTIME_ENV_FILE?.trim();
+  const configuredRuntimeEnv = process.env.RUNTIME_ENV_FILE?.trim();
   const runtimeEnv = configuredRuntimeEnv
     ? resolve(configuredRuntimeEnv)
     : resolve(
@@ -17,7 +17,7 @@ export function loadRuntimeEnvironment(): void {
       );
   if (!existsSync(runtimeEnv)) {
     throw new Error(
-      'Generated auth-service runtime environment is missing; set KG_PAY_RUNTIME_ENV_FILE or start the service with its pnpm script.',
+      'Generated auth-service runtime environment is missing; set RUNTIME_ENV_FILE or start the service with its pnpm script.',
     );
   }
   process.loadEnvFile(runtimeEnv);
