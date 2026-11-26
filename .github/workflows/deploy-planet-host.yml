@@ -178,6 +178,11 @@ jobs:
               if (typeof PrismaClient !== 'function') process.exit(1);
             "
           )
+          if ! find "$release_dir/services/auth-service/node_modules" \
+            -type f -name '*debian-openssl-1.1.x*' -print -quit | grep -q .; then
+            echo "The auth-service release is missing Prisma's Debian OpenSSL 1.1 query engine."
+            exit 1
+          fi
 
           test -f "$release_dir/packages/contracts/dist/index.js"
           test -f "$release_dir/services/auth-service/dist/main.js"
