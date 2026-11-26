@@ -87,9 +87,12 @@ function validateReleaseDirectory(releaseDir) {
   const manifest = readManifest(releaseDir);
   for (const relativePath of [
     "apps/customer-portal/dist/index.html",
+    "apps/customer-portal/dist/favicon.svg",
     "apps/staff-portal/dist/index.html",
+    "apps/staff-portal/dist/favicon.svg",
     "services/auth-service/package.json",
     "services/auth-service/dist/main.js",
+    "services/auth-service/dist/cli/bootstrap-super-admin.js",
     "services/auth-service/node_modules/@kgpay/contracts/package.json",
     "services/auth-service/node_modules/@nestjs/core/package.json",
     "services/auth-service/node_modules/@prisma/client/package.json",

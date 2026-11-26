@@ -1,4 +1,4 @@
-const CACHE_NAME = "kgpay-staff-portal-shell-v1";
+const CACHE_NAME = "kgpay-staff-portal-shell-v2";
 const APP_SCOPE = new URL(self.registration.scope);
 const APP_SHELL_URL = APP_SCOPE.href;
 const STATIC_PATHS = [

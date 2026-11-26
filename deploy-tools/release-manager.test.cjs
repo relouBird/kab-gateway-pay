@@ -12,17 +12,26 @@ const {
   validateArchiveEntries,
 } = require("./release-manager.cjs");
 
-function createReleaseArchive(t, rootDir, commit = "a".repeat(40)) {
+function createReleaseArchive(
+  t,
+  rootDir,
+  commit = "a".repeat(40),
+  omittedFiles = [],
+) {
   const sourceDir = path.join(rootDir, "source");
   const archive = path.join(rootDir, "incoming.tar.gz");
   const files = {
     "manifest.json": JSON.stringify({ commit, ref: "main", version: "0.0.1" }),
     "apps/customer-portal/dist/index.html": "<html>customer</html>",
+    "apps/customer-portal/dist/favicon.svg": "<svg />",
     "apps/staff-portal/dist/index.html": "<html>staff</html>",
+    "apps/staff-portal/dist/favicon.svg": "<svg />",
     "services/auth-service/package.json": JSON.stringify({
       name: "auth-service",
     }),
     "services/auth-service/dist/main.js": "module.exports = {};",
+    "services/auth-service/dist/cli/bootstrap-super-admin.js":
+      "module.exports = {};",
     "services/auth-service/node_modules/@kgpay/contracts/package.json": "{}",
     "services/auth-service/node_modules/@nestjs/core/package.json": "{}",
     "services/auth-service/node_modules/@prisma/client/package.json": "{}",
@@ -35,6 +44,7 @@ function createReleaseArchive(t, rootDir, commit = "a".repeat(40)) {
   };
 
   for (const [relativePath, contents] of Object.entries(files)) {
+    if (omittedFiles.includes(relativePath)) continue;
     const filePath = path.join(sourceDir, relativePath);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, contents);
@@ -80,6 +90,20 @@ test("release promotion keeps a dated history and atomically updates dist", (t) 
     "<html>customer</html>",
   );
   assert.equal(
+    fs.readFileSync(
+      path.join(
+        deployRoot,
+        "dist",
+        "apps",
+        "staff-portal",
+        "dist",
+        "favicon.svg",
+      ),
+      "utf8",
+    ),
+    "<svg />",
+  );
+  assert.equal(
     fs.existsSync(
       path.join(
         deployRoot,
@@ -115,6 +139,30 @@ test("release promotion keeps a dated history and atomically updates dist", (t) 
     ),
     false,
   );
+});
+
+test("release promotion rejects missing portal icons and bootstrap CLI", (t) => {
+  for (const missingFile of [
+    "apps/staff-portal/dist/favicon.svg",
+    "services/auth-service/dist/cli/bootstrap-super-admin.js",
+  ]) {
+    const tempDir = createTempDirectory(t);
+    const archive = createReleaseArchive(t, tempDir, "a".repeat(40), [
+      missingFile,
+    ]);
+
+    assert.throws(
+      () =>
+        applyRelease({
+          archive,
+          deployRoot: path.join(tempDir, "planet-host"),
+          expectedCommit: "a".repeat(40),
+        }),
+      new RegExp(
+        `Required release file is missing: ${missingFile.replaceAll("/", "\\/").replaceAll(".", "\\.")}`,
+      ),
+    );
+  }
 });
 
 test("release promotion retains only the five newest dated releases", (t) => {

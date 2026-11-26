@@ -17,7 +17,7 @@ runtime_env_name="auth-service-runtime-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.env"
 manager_name="release-manager-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.cjs"
 publisher_name="portal-publisher-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.cjs"
 
-printf -v deploy_command 'bash -s -- %q %q %q %q %q %q %q %q %q %q %q %q' \
+printf -v deploy_command 'bash -s -- %q %q %q %q %q %q %q %q %q %q %q %q %q' \
   "$SERVER_DEPLOY_ROOT" \
   "$SERVER_NODE_ENV_ACTIVATE" \
   "$SERVER_AUTH_SERVICE_NODE_ENV_ACTIVATE" \
@@ -29,7 +29,8 @@ printf -v deploy_command 'bash -s -- %q %q %q %q %q %q %q %q %q %q %q %q' \
   "$publisher_name" \
   "$runtime_env_name" \
   "$REPOSITORY" \
-  "$DEPLOY_MODE"
+  "$DEPLOY_MODE" \
+  "$DEPLOY_BRANCH"
 
 ssh -i "$RUNNER_TEMP/deploy_key" \
   -p "$SERVER_SSH_PORT" \

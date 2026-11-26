@@ -14,6 +14,15 @@ publisher_name="$9"
 runtime_env_name="${10}"
 repository="${11}"
 mode="${12}"
+target_branch="${13}"
+
+case "$target_branch" in
+  main|test) ;;
+  *)
+    echo "ERROR: Deployment branch must be main or test."
+    exit 1
+    ;;
+esac
 
 repository_dir="$root/repository"
 archive="$root/incoming/$archive_name"
@@ -151,11 +160,11 @@ if [ "$mode" = "initialize" ]; then
     exit 1
   fi
   clone_tmp_owned=1
-  git clone --depth=1 --branch main \
+  git clone --depth=1 --branch "$target_branch" \
     "https://github.com/$repository.git" "$clone_tmp"
-  cloned_commit="$(git -C "$clone_tmp" rev-parse origin/main)"
+  cloned_commit="$(git -C "$clone_tmp" rev-parse "origin/$target_branch")"
   if [ "$cloned_commit" != "$expected_commit" ]; then
-    echo "ERROR: GitHub main advanced before the first deployment; rerun the workflow."
+    echo "ERROR: GitHub $target_branch advanced before the first deployment; rerun the workflow."
     exit 1
   fi
   git -C "$clone_tmp" reset --hard "$expected_commit"
@@ -166,10 +175,10 @@ elif [ "$mode" = "deploy" ]; then
     echo "ERROR: Repository is not initialized. Run the first-deployment workflow first."
     exit 1
   fi
-  git -C "$repository_dir" fetch --prune origin main
-  remote_commit="$(git -C "$repository_dir" rev-parse origin/main)"
+  git -C "$repository_dir" fetch --prune origin "$target_branch"
+  remote_commit="$(git -C "$repository_dir" rev-parse "origin/$target_branch")"
   if [ "$remote_commit" != "$expected_commit" ]; then
-    echo "ERROR: GitHub main advanced before deployment; rerun the workflow for the latest commit."
+    echo "ERROR: GitHub $target_branch advanced before deployment; rerun the workflow for the latest commit."
     exit 1
   fi
   git -C "$repository_dir" reset --hard "$expected_commit"
@@ -238,15 +247,19 @@ runtime_env_next_owned=0
 rmdir "$runtime_env_stage"
 runtime_env_stage_owned=0
 
-(
-  source "$auth_node_env"
-  set -u
-  node --version
-  /usr/sbin/cloudlinux-selector restart \
-    --json \
-    --interpreter=nodejs \
-    --app-root="$auth_app_root"
-)
+if [ "$mode" = "initialize" ]; then
+  echo "Initial release installed; auth-service startup is deferred until migrations and super-admin bootstrap are complete."
+else
+  (
+    source "$auth_node_env"
+    set -u
+    node --version
+    /usr/sbin/cloudlinux-selector restart \
+      --json \
+      --interpreter=nodejs \
+      --app-root="$auth_app_root"
+  )
+fi
 
 (
   source "$deploy_node_env"
@@ -270,4 +283,8 @@ fi
 rm -rf -- "$root/dist"
 rm -f -- "$archive" "$manager" "$portal_publisher"
 trap - EXIT
-echo "Deployment successful: $expected_commit"
+if [ "$mode" = "initialize" ]; then
+  echo "Initial release installed: $expected_commit"
+else
+  echo "Deployment successful: $expected_commit"
+fi

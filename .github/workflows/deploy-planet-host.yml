@@ -9,30 +9,53 @@ on:
         description: initialize or deploy
         required: true
         type: string
+      target_environment:
+        description: GitHub environment to deploy to
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: kgpay-production
+  group: kgpay-${{ inputs.target_environment }}
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Build and deploy main
+    name: Build and deploy ${{ inputs.target_environment }}
     runs-on: ubuntu-latest
-    environment: production
+    environment:
+      name: ${{ inputs.target_environment }}
 
     steps:
-      - name: Validate production inputs
+      - name: Validate deployment inputs
         env:
           DEPLOY_MODE: ${{ inputs.mode }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+          TARGET_ENVIRONMENT_MARKER: ${{ vars.KG_PAY_DEPLOY_TARGET }}
           KG_PAY_APP_ENV: ${{ secrets.KG_PAY_APP_ENV }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF_NAME" != "main" ]]; then
-            echo "Production deployment is allowed only from main."
+          case "$TARGET_ENVIRONMENT" in
+            production)
+              expected_branch="main"
+              ;;
+            test)
+              expected_branch="test"
+              ;;
+            *)
+              echo "Unknown deployment environment: $TARGET_ENVIRONMENT"
+              exit 1
+              ;;
+          esac
+          if [[ "$GITHUB_REF_NAME" != "$expected_branch" ]]; then
+            echo "Deployment to $TARGET_ENVIRONMENT is allowed only from $expected_branch."
+            exit 1
+          fi
+          if [[ "$TARGET_ENVIRONMENT" == "test" && "$TARGET_ENVIRONMENT_MARKER" != "test" ]]; then
+            echo "::error::Set the test environment variable KG_PAY_DEPLOY_TARGET to test."
             exit 1
           fi
           if [[ "$DEPLOY_MODE" != "initialize" && "$DEPLOY_MODE" != "deploy" ]]; then
@@ -40,7 +63,7 @@ jobs:
             exit 1
           fi
           if [[ -z "$KG_PAY_APP_ENV" ]]; then
-            echo "::error::KG_PAY_APP_ENV is required in the production environment."
+            echo "::error::KG_PAY_APP_ENV is required in the $TARGET_ENVIRONMENT environment."
             exit 1
           fi
 
@@ -130,6 +153,7 @@ jobs:
           for portal in customer-portal staff-portal; do
             portal_dist="$release_dir/apps/$portal/dist"
             test -f "$portal_dist/index.html"
+            test -f "$portal_dist/favicon.svg"
             find "$portal_dist" -type d -exec chmod 755 {} +
             find "$portal_dist" -type f -exec chmod 644 {} +
           done
@@ -153,6 +177,7 @@ jobs:
 
           test -f "$release_dir/packages/contracts/dist/index.js"
           test -f "$release_dir/services/auth-service/dist/main.js"
+          test -f "$release_dir/services/auth-service/dist/cli/bootstrap-super-admin.js"
           test -f "$release_dir/services/auth-service/prisma/schema.prisma"
           test -f "$release_dir/services/auth-service/prisma/migrations/migration_lock.toml"
           test -f "$release_dir/services/auth-service/node_modules/@nestjs/core/package.json"
@@ -216,8 +241,20 @@ jobs:
           SERVER_KGAPPS_ROOT: ${{ secrets.SERVER_KGAPPS_ROOT }}
           REPOSITORY: ${{ github.repository }}
           DEPLOY_MODE: ${{ inputs.mode }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+          DEPLOY_ENVIRONMENT: ${{ inputs.target_environment }}
         shell: bash
-        run: bash deploy-tools/upload-release.sh
+        run: |
+          set -euo pipefail
+          if [[ -z "$SERVER_DEPLOY_ROOT" || "$SERVER_DEPLOY_ROOT" == "/" ]]; then
+            echo "::error::SERVER_DEPLOY_ROOT must be a non-root absolute path."
+            exit 1
+          fi
+          if [[ "$DEPLOY_ENVIRONMENT" == "test" ]]; then
+            SERVER_DEPLOY_ROOT="${SERVER_DEPLOY_ROOT%/}/test"
+          fi
+          export SERVER_DEPLOY_ROOT
+          bash deploy-tools/upload-release.sh
 
       # Partie 2/2 : promotion de la release, publication web et redémarrage sur PH.
       - name: Apply release on PlanetHoster
@@ -232,8 +269,20 @@ jobs:
           SERVER_KGAPPS_ROOT: ${{ secrets.SERVER_KGAPPS_ROOT }}
           REPOSITORY: ${{ github.repository }}
           DEPLOY_MODE: ${{ inputs.mode }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+          DEPLOY_ENVIRONMENT: ${{ inputs.target_environment }}
         shell: bash
-        run: bash deploy-tools/deploy-release.sh
+        run: |
+          set -euo pipefail
+          if [[ -z "$SERVER_DEPLOY_ROOT" || "$SERVER_DEPLOY_ROOT" == "/" ]]; then
+            echo "::error::SERVER_DEPLOY_ROOT must be a non-root absolute path."
+            exit 1
+          fi
+          if [[ "$DEPLOY_ENVIRONMENT" == "test" ]]; then
+            SERVER_DEPLOY_ROOT="${SERVER_DEPLOY_ROOT%/}/test"
+          fi
+          export SERVER_DEPLOY_ROOT
+          bash deploy-tools/deploy-release.sh
 
       - name: Remove temporary deployment credentials
         if: always()

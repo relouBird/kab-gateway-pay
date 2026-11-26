@@ -7,6 +7,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      target_environment:
+        description: GitHub environment cible
+        required: true
+        type: choice
+        options:
+          - production
+          - test
+        default: production
   workflow_call:
     inputs:
       mode:
@@ -14,6 +23,11 @@ on:
         required: false
         type: string
         default: deploy
+      target_environment:
+        description: Environnement GitHub cible
+        required: false
+        type: string
+        default: production
 
 permissions:
   contents: read
@@ -24,4 +38,5 @@ jobs:
     uses: ./.github/workflows/deploy-planet-host.yml
     with:
       mode: ${{ inputs.mode || 'deploy' }}
+      target_environment: ${{ inputs.target_environment || 'production' }}
     secrets: inherit

@@ -13,4 +13,5 @@ jobs:
     uses: ./.github/workflows/build-artifacts.yml
     with:
       mode: initialize
+      target_environment: production
     secrets: inherit
