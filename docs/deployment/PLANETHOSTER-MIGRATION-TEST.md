@@ -14,7 +14,7 @@ Après avoir confirmé la sauvegarde de la base test et le dernier déploiement,
 source /home/tfrtbadvag/nodevenv/kgpay_deploy/22/bin/activate
 
 DEPLOY_ROOT="/home/tfrtbadvag/kgpay_deploy/test"
-AUTH_APP_ROOT="/home/tfrtbadvag/kgservices-test/auth-service"
+AUTH_APP_ROOT="/home/tfrtbadvag/kgservices-test/auth"
 SCHEMA="$DEPLOY_ROOT/repository/services/auth-service/prisma/schema.prisma"
 SERVICE_ENV="$AUTH_APP_ROOT/.generated/env/auth-service.env"
 PRISMA_CONFIG="$DEPLOY_ROOT/repository/services/auth-service/prisma.config.ts"
@@ -23,6 +23,11 @@ test -f "$SCHEMA" && test -f "$PRISMA_CONFIG" && test -s "$SERVICE_ENV"
 
 KG_PAY_ENV_FILE="$SERVICE_ENV" npx --yes prisma@7.8.0 \
   migrate deploy --config="$PRISMA_CONFIG"
+
+# Lancer la creation du super-admin
+export KG_PAY_ENV_FILE="$AUTH_APP_ROOT/.generated/env/auth-service.env" # Inutile mais bon.
+cd "$AUTH_APP_ROOT/runtime"
+node dist/cli/bootstrap-super-admin.js
 ```
 
 Cette commande applique seulement les migrations versionnées en attente, sans créer de nouvelle migration ni réinitialiser la base. `npx` télécharge Prisma s'il n'est pas déjà dans le cache du compte PH; le serveur doit donc pouvoir accéder au registre npm. Si la commande échoue, arrêter et transmettre l'erreur non sensible au lieu de la relancer à l'aveugle. Après réussite, redémarrer Passenger pour l'application test.
@@ -81,7 +86,7 @@ Prendre `RELEASE_ID` dans le chemin de la release du journal, au format UTC `YYY
 Après avoir vérifié la sauvegarde, utiliser le runtime privé de l'application **test**, qui contient la valeur issue de `DATABASE_URL__AUTH_SERVICE` du `KG_PAY_APP_ENV test`. Ne pas utiliser le runtime de production.
 
 ```bash
-KG_PAY_ENV_FILE="/home/tfrtbadvag/kgservices-test/auth-service/.generated/env/auth-service.env"
+KG_PAY_ENV_FILE="/home/tfrtbadvag/kgservices-test/auth/.generated/env/auth-service.env"
 test -s "$KG_PAY_ENV_FILE"
 export KG_PAY_ENV_FILE
 
@@ -111,7 +116,7 @@ Si c'est le premier démarrage de cette base et que le premier `GLOBAL_SUPER_ADM
 Ensuite, redémarrer l'application Node.js CloudLinux **test** avec son APP_ROOT test :
 
 ```bash
-AUTH_APP_ROOT="/home/tfrtbadvag/kgservices-test/auth-service"
+AUTH_APP_ROOT="/home/tfrtbadvag/kgservices-test/auth"
 /usr/sbin/cloudlinux-selector restart \
   --json \
   --interpreter=nodejs \

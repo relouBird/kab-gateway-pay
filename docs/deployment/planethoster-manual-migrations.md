@@ -86,15 +86,29 @@ Depuis une session SSH interactive, après la migration :
 ```bash
 set -e
 AUTH_APP_ROOT="/chemin/absolu/privé/auth-service"
-source "/chemin/absolu/nodevenv/auth-service/22/bin/activate"
+NODE_ENV_ACTIVATE="/chemin/absolu/nodevenv/<application>/22/bin/activate"
+source "$NODE_ENV_ACTIVATE"
 set -u
 export KG_PAY_ENV_FILE="$AUTH_APP_ROOT/.generated/env/auth-service.env"
+if [[ ! -s "$KG_PAY_ENV_FILE" ]]; then
+  echo "Le fichier d'environnement privé auth-service est absent."
+  exit 1
+fi
 cd "$AUTH_APP_ROOT/runtime"
-test -s dist/cli/bootstrap-super-admin.js
+if [[ ! -s dist/cli/bootstrap-super-admin.js ]]; then
+  echo "La CLI bootstrap-super-admin est absente de la release."
+  exit 1
+fi
+if [[ ! -t 0 ]]; then
+  echo "Le bootstrap exige une session SSH interactive."
+  exit 1
+fi
 node dist/cli/bootstrap-super-admin.js
 ```
 
-La CLI charge le runtime privé, demande l'e-mail, le téléphone de contact et le mot de passe sans l'afficher, envoie un OTP via le SMTP configuré, puis demande le code reçu. Aucun mot de passe par défaut n'est créé. Le téléphone reste non vérifié. La base et le SMTP doivent être accessibles depuis le serveur. Cette initialisation ne se fait qu'une fois ; le backend refuse de recréer un administrateur initial après validation.
+Utiliser l'`AUTH_APP_ROOT` et l'environnement Node de l'environnement ciblé (`test` ou `production`), jamais ceux d'un autre environnement. Le nom `<application>` dans le chemin d'activation est celui du virtualenv Node créé dans CloudLinux.
+
+La CLI charge le runtime privé, demande l'e-mail, le téléphone de contact, puis le mot de passe deux fois sans l'afficher. Elle envoie un OTP via le SMTP configuré et demande le code reçu pour vérifier l'adresse et terminer la création du premier `GLOBAL_SUPER_ADMIN`. Aucun mot de passe par défaut n'est créé. Le téléphone reste non vérifié. La base et le SMTP doivent être accessibles depuis le serveur. Cette initialisation ne se fait qu'une fois ; le backend refuse de recréer un administrateur initial après validation.
 
 Après la confirmation de la CLI, démarrer l'application CloudLinux :
 
