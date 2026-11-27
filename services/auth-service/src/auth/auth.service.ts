@@ -12,7 +12,7 @@ import {
   OtpPurpose,
   Prisma,
   type SubjectType,
-} from '@prisma/client';
+} from '@prisma/generated';
 import {
   PERMISSION_CATALOG,
   SUPER_ADMIN_ONLY_PERMISSIONS,

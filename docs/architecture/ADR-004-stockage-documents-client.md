@@ -18,7 +18,7 @@ Le cœur 2 collecte des justificatifs d'identité et de domicile : ce sont des *
 | # | Décision | Statut |
 | --- | --- | --- |
 | S1 | Un port `DocumentStore` isole le stockage. Adaptateurs : **système de fichiers** hors racine publique (développement et hébergement contraint) et **stockage objet compatible S3** (cible dès que disponible). Les métadonnées restent dans la base de `customer-service`. | [PROPOSITION] |
-| S2 | **Chiffrement applicatif au repos** : chaque document est chiffré (AES-256-GCM) avec une clé de données propre, elle-même chiffrée par une clé maîtresse injectée à l'exécution (`runtimeOnlyKeys`). L'identifiant de clé est stocké pour permettre la rotation. Le fournisseur de stockage ne voit que du chiffré. | [PROPOSITION] |
+| S2 | **Chiffrement applicatif au repos** : chaque document est chiffré (AES-256-GCM) avec une clé de données propre, elle-même chiffrée par une clé maîtresse chargée depuis le fichier d'environnement propre au service (ADR-001 §5). L'identifiant de clé est stocké pour permettre la rotation. Le fournisseur de stockage ne voit que du chiffré. | [PROPOSITION] |
 | S3 | **Aucune URL publique.** Le contenu est servi par `customer-service` après contrôle d'identité, de permission **et** de propriété, avec `Cache-Control: no-store` et `X-Content-Type-Options: nosniff`. | [PROPOSITION] |
 | S4 | **Téléversement via `customer-service`** (multipart, flux), sans URL pré-signée en V1. Limites configurables : taille maximale par fichier, nombre maximal de documents par dossier, débit par identité. | [PROPOSITION] |
 | S5 | **Types acceptés** : JPEG, PNG, PDF, vérifiés par signature binaire (pas par extension ni par en-tête déclaré). Nom de fichier d'origine conservé en métadonnée seulement, assaini ; clé de stockage aléatoire. | [PROPOSITION] |
@@ -59,6 +59,6 @@ Aucune durée légale n'est présumée.
 
 | Document | Mise à jour |
 | --- | --- |
-| ADR-001 §5 | Ajouter la clé maîtresse documentaire aux clés `runtimeOnlyKeys` de `customer-service`. |
+| ADR-001 §5 | Ajouter la clé maîtresse documentaire au schéma d'environnement de `customer-service`; elle ne doit pas être publiée dans les artefacts. |
 | CDC-02 | Référence S1 à S10 dans les exigences documentaires (CUS-F-06 à CUS-F-09). |
 | RECETTE-02 | Tests de lecture, d'accès croisé, de type de fichier et de taille. |

@@ -57,28 +57,26 @@ La première commande produit un secret HS256 de 64 octets encodé en base64url 
 
 ### Secret de signature de production sur PlanetHoster
 
-Dans `.env.prod`, renseigner une fois `JWT_SIGNING_SECRET__AUTH_SERVICE` avec le résultat de la première commande ci-dessus, puis mettre à jour le secret GitHub `KG_PAY_APP_ENV`. Supprimer du profil les anciennes variables `JWT_PRIVATE_KEY_FILE__AUTH_SERVICE`, `JWT_KEY_ID__AUTH_SERVICE` et `AUTH_SIGNING_PUBLIC_KEYS_JSON__AUTH_SERVICE`. `JWT_SIGNING_PREVIOUS_SECRETS_JSON__AUTH_SERVICE` reste vide en fonctionnement normal. Aucun chemin d'APP_ROOT, identifiant `kid`, fichier RSA ou provisioning sur PH n'est nécessaire.
+Dans `.env.prod`, renseigner une fois `JWT_SIGNING_SECRET__AUTH_SERVICE` avec le résultat de la première commande ci-dessus, puis mettre à jour le secret GitHub `KG_PAY_APP_ENV`. Supprimer du profil les anciennes variables `JWT_PRIVATE_KEY_FILE__AUTH_SERVICE`, `JWT_KEY_ID__AUTH_SERVICE`, `AUTH_SIGNING_PUBLIC_KEYS_JSON__AUTH_SERVICE` et `RUNTIME_ENV_FILE__AUTH_SERVICE`. `JWT_SIGNING_PREVIOUS_SECRETS_JSON__AUTH_SERVICE` reste vide en fonctionnement normal. Aucun chemin d'APP_ROOT, identifiant `kid`, fichier RSA ou provisioning sur PH n'est nécessaire.
 
-Le workflow génère le runtime filtré depuis `KG_PAY_APP_ENV` et le transfère vers l'APP_ROOT privé d'`auth-service`. Le secret est inclus uniquement dans ce fichier runtime protégé, jamais dans l'archive de build ni les variables publiques Vite. Tout futur service vérifiant ces JWT devra recevoir le même secret; il pourra donc aussi signer des jetons. Les JWT RS256 actuellement en circulation ne seront pas acceptés après la migration; les clients devront rafraîchir leur access token et refaire un step-up si une preuve RS256 reste active. Pour une rotation, définir le nouveau `JWT_SIGNING_SECRET__AUTH_SERVICE` et placer l'ancien secret dans `JWT_SIGNING_PREVIOUS_SECRETS_JSON__AUTH_SERVICE` (tableau JSON), puis retirer l'ancien après expiration des jetons qu'il a signés. Les secrets précédents doivent être fournis aux services vérificateurs pendant le chevauchement.
+Le workflow génère le fichier filtré depuis `KG_PAY_APP_ENV` et le transfère vers l'APP_ROOT privé d'`auth-service`. Le secret reste dans ce fichier protégé, jamais dans l'archive de build ni les variables publiques Vite. Tout futur service vérifiant ces JWT devra recevoir le même secret; il pourra donc aussi signer des jetons. Les JWT RS256 actuellement en circulation ne seront pas acceptés après la migration; les clients devront rafraîchir leur access token et refaire un step-up si une preuve RS256 reste active. Pour une rotation, définir le nouveau `JWT_SIGNING_SECRET__AUTH_SERVICE` et placer l'ancien secret dans `JWT_SIGNING_PREVIOUS_SECRETS_JSON__AUTH_SERVICE` (tableau JSON), puis retirer l'ancien après expiration des jetons qu'il a signés. Les secrets précédents doivent être fournis aux services vérificateurs pendant le chevauchement.
 
 ### Emplacement et cycle de vie des fichiers générés
 
 Le générateur lit `.env` à la racine et filtre les variables avec `services/auth-service/env.schema.json`. Il ne lit pas `.env` directement dans le code métier.
 
-- `.generated/env/auth-service.build.env` : variables non secrètes autorisées au build. Ce fichier ne contient ni `DATABASE_URL`, ni clés, ni credentials ; il n'est pas copié dans `dist`.
-- `.generated/env/auth-service.runtime.env` : variables du processus `auth-service`, dont `DATABASE_URL` et les secrets nécessaires au service. `start`, `start:dev`, `start:prod`, la CLI d'initialisation et les commandes de migration le génèrent ou le chargent automatiquement.
-- Les deux fichiers sont générés sous `.generated/env/` à la racine, ignorés par Git et remplaçables à tout moment. Les autres workspaces produiront des fichiers avec leur propre nom, par exemple `.generated/env/customer-portal.build.env`.
+- `.generated/env/auth-service.env` : toutes les variables déclarées pour `auth-service`, y compris `DATABASE_URL` et les secrets nécessaires au service. `build`, `start`, la CLI d'initialisation et les commandes de migration régénèrent le fichier ciblé avant exécution.
+- Un seul fichier par workspace est généré sous `.generated/env/` à la racine et ignoré par Git. Les portails ont leurs propres fichiers, limités à leurs variables `VITE_*` publiques.
 
-En production sur PlanetHoster, le workflow reconstruit temporairement le profil `.env.prod` depuis le secret GitHub `KG_PAY_APP_ENV`, puis génère le runtime filtré pour `auth-service` avec les noms non suffixés attendus par l'application. Ce fichier est transféré séparément de l'archive vers `"$SERVER_AUTH_SERVICE_APP_ROOT/.generated/env/auth-service.runtime.env"`; le `.env` source n'est jamais copié sur PH ni inclus dans un artefact. Le runtime empaqueté retrouve ce chemin automatiquement. `RUNTIME_ENV_FILE` peut être défini dans l'application Node CloudLinux comme chemin absolu, mais une valeur placée uniquement dans un `.env` séparé ou dans `KG_PAY_APP_ENV` ne configure pas l'environnement de Passenger avant le chargement. Aucun fichier de clé séparé n'est créé. Le clone source reste sous `SERVER_DEPLOY_ROOT/repository/` pour les opérations manuelles; seul `runtime/` est remplacé lors d'une release.
+En production sur PlanetHoster, le workflow reconstruit temporairement le profil `.env.prod` depuis le secret GitHub `KG_PAY_APP_ENV`, puis génère `.generated/env/auth-service.env` avec les noms non suffixés attendus par l'application. Ce fichier est transféré séparément de l'archive vers `"$SERVER_AUTH_SERVICE_APP_ROOT/.generated/env/auth-service.env"`; le `.env` source n'est jamais copié sur PH ni inclus dans un artefact. Le runtime empaqueté retrouve ce chemin automatiquement; aucune variable CloudLinux n'est requise. Depuis le clone source, `KG_PAY_ENV_FILE` peut pointer vers le fichier privé pour exécuter Prisma ou la CLI. Aucun fichier de clé séparé n'est créé. Le clone source reste sous `SERVER_DEPLOY_ROOT/repository/`; seul `runtime/` est remplacé lors d'une release.
 
 Commandes de génération explicite :
 
 ```powershell
-pnpm env:build
-pnpm env:runtime
+pnpm env:generate --target auth-service
 ```
 
-Le build et le démarrage via Turbo déclenchent eux-mêmes la génération appropriée. Les secrets ne sont jamais injectés dans les builds ni les bundles frontend.
+Les commandes de workspace régénèrent automatiquement le fichier ciblé avant build, démarrage, tests, vérification de types et opérations Prisma. Les secrets ne sont pas inclus dans les artefacts compilés ni les bundles frontend.
 
 Appliquer la migration et lancer le service :
 
@@ -112,12 +110,15 @@ Ne pas enregistrer de vrais mots de passe, OTP, preuves, jetons ou credentials d
 
 ## Migrations et qualité
 
+Le service utilise Prisma ORM 7.8.0. [prisma.config.ts](./prisma.config.ts) fixe le schéma et le dossier de migrations, puis appelle le même loader que l'application pour lire `.generated/env/auth-service.env`. Il n'existe pas de fichier ni de wrapper d'environnement spécifique à Prisma. Le client est généré dans `src/generated/prisma/`, ignoré par Git puis compilé dans `dist/`; l'adapter PostgreSQL utilise le pool `pg` et reçoit explicitement le schéma indiqué par `schema=` dans l'URL (défaut `public`). Le paramètre `connection_limit` de l'URL, s'il est fourni, règle le nombre maximal de connexions; sinon le défaut du driver `pg` s'applique.
+
 Les migrations Prisma sont versionnées sous `prisma/migrations/`. La migration initiale protège aussi `AccessEvent` contre les mises à jour/suppressions. Commandes disponibles :
 
 ```powershell
 pnpm db:auth-service:generate
 pnpm db:auth-service:migrate:dev
 pnpm db:auth-service:migrate:deploy
+pnpm --filter auth-service db:migrate:status
 pnpm lint:auth-service
 pnpm typecheck:auth-service
 pnpm test:auth-service
@@ -127,9 +128,11 @@ pnpm test:e2e:auth-service:maildev
 pnpm build:auth-service
 ```
 
+Les commandes `db:generate`, `db:format`, `db:migrate:dev`, `db:migrate:deploy`, `db:migrate:status` et `db:studio` sont exposées dans le workspace `auth-service` et utilisent sa Prisma Config. Depuis PlanetHoster, le clone source peut lancer `KG_PAY_ENV_FILE=/chemin/privé/auth-service.env npx --yes prisma@7.8.0 migrate deploy --config=/chemin/vers/repository/services/auth-service/prisma.config.ts`. Le loader partagé charge alors les mêmes variables que l'application. Aucun `--schema` ni pnpm n'est nécessaire sur le serveur.
+
 `pnpm test:e2e:auth-service` exécute le test e2e de liveness. `pnpm test:e2e:auth-service:isolated` exécute les parcours d'intégration HTTP sur une base PostgreSQL locale : inscription, MFA, step-up, sessions/refresh/logout, récupération de mot de passe, amorçage du super-admin et invitation/MFA STAFF avec contrôle de permission. Le runner crée un schéma au nom aléatoire, applique les migrations, remplace les transports email par des boîtes mémoire de test pour récupérer OTP et invitation, puis supprime uniquement ce schéma. Il refuse les URL de base qui ne pointent pas vers localhost. Ces tests n'exercent donc pas la livraison SMTP réelle ni l'ensemble des critères de recette CDC-01.
 `pnpm test:e2e:auth-service:maildev` utilise le même schéma isolé, mais conserve le transport SMTP configuré et récupère les OTP via les outils MCP de l'instance Maildev locale. Il n'envoie des messages qu'à une adresse synthétique `example.test`, refuse un `SMTP_HOST` distant et supprime uniquement les messages reçus par cette adresse. La commande exige `maildev --mcp` ; elle n'arrête ni ne relance Maildev.
 
-La CLI `pnpm auth:bootstrap` est une commande interactive de premier amorçage, pas un endpoint HTTP/Swagger. En production, la release contient sa version compilée sous `runtime/dist/cli/bootstrap-super-admin.js`, validée lors de la construction de l'archive. Après la migration initiale, l'exécuter dans un terminal SSH interactif en renseignant `RUNTIME_ENV_FILE` vers le runtime privé ; la procédure complète est dans [Migrations Prisma manuelles sur PlanetHoster](../../docs/deployment/planethoster-manual-migrations.md). Le démarrage effectif sur PH et la recette du premier bootstrap restent à valider.
+La CLI `pnpm auth:bootstrap` est une commande interactive de premier amorçage, pas un endpoint HTTP/Swagger. En production, la release contient sa version compilée sous `runtime/dist/cli/bootstrap-super-admin.js`, validée lors de la construction de l'archive. Après la migration initiale, l'exécuter dans un terminal SSH interactif; elle retrouve automatiquement l'environnement privé dans l'APP_ROOT. La procédure complète est dans [Migrations Prisma manuelles sur PlanetHoster](../../docs/deployment/planethoster-manual-migrations.md). Le démarrage effectif sur PH et la recette du premier bootstrap restent à valider.
 
 Les valeurs numériques du CDC-01 §8.5 restent des valeurs proposées configurables, pas des décisions métier. Les interfaces client/personnel, le parcours support de récupération d'un `CUSTOMER` ayant perdu sa boîte e-mail, le fournisseur SMTP de production et le choix du broker restent ouverts. En attendant le broker, le relay local journalise uniquement les identifiants/noms d'événement ; les payloads restent dans l'outbox et ne sont pas envoyés à des consommateurs.

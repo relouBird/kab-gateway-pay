@@ -2,11 +2,11 @@ import { BadRequestException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { createInterface } from 'node:readline';
 import { AuthService } from '../auth/auth.service';
-import { loadRuntimeEnvironment } from '../config/runtime-env';
+import { loadEnvironment } from '../config/environment';
 import { AppModule } from '../app.module';
 
 async function main(): Promise<void> {
-  loadRuntimeEnvironment();
+  loadEnvironment();
   const app = await NestFactory.createApplicationContext(AppModule);
   try {
     const auth = app.get(AuthService);

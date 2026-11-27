@@ -4,7 +4,7 @@
 
 Le journal Passenger montre que `auth-service` atteint PostgreSQL, puis échoue avec `P2021` : la table `test.Role` n'existe pas. Le moteur Prisma est maintenant chargé ; l'environnement de test doit recevoir ses migrations. Cette procédure ne concerne que la base de test et ne doit jamais utiliser les chemins ou l'URL de production.
 
-Le changement récent de cible native Prisma (`debian-openssl-1.1.x`) ne modifie pas le schéma SQL. Il ne demande donc pas, à lui seul, de migration. C'est l'erreur `test.Role does not exist` qui confirme que la base test doit être initialisée/mise à jour.
+Le changement antérieur du moteur Prisma ne modifie pas le schéma SQL et ne demandait donc pas, à lui seul, de migration. C'est l'erreur `test.Role does not exist` qui confirme que la base test doit recevoir ses migrations. Prisma 7 utilise maintenant l'adapter PostgreSQL et ne nécessite plus de cible native Query Engine pour ce client.
 
 ## Version courte
 
@@ -16,20 +16,20 @@ source "$HOME/nodevenv/<environnement-node-du-deploiement>/22/bin/activate"
 DEPLOY_ROOT="/chemin/absolu/privé/kgpay_deploy/test"
 AUTH_APP_ROOT="/chemin/absolu/privé/auth-service-test"
 SCHEMA="$DEPLOY_ROOT/repository/services/auth-service/prisma/schema.prisma"
-RUNTIME_ENV="$AUTH_APP_ROOT/.generated/env/auth-service.runtime.env"
+SERVICE_ENV="$AUTH_APP_ROOT/.generated/env/auth-service.env"
+PRISMA_CONFIG="$DEPLOY_ROOT/repository/services/auth-service/prisma.config.ts"
 
-test -f "$SCHEMA" && test -s "$RUNTIME_ENV"
+test -f "$SCHEMA" && test -f "$PRISMA_CONFIG" && test -s "$SERVICE_ENV"
 
-node --env-file="$RUNTIME_ENV" "$(command -v npx)" \
-  --yes --package=prisma@6.19.3 \
-  prisma migrate deploy --schema="$SCHEMA"
+KG_PAY_ENV_FILE="$SERVICE_ENV" npx --yes prisma@7.8.0 \
+  migrate deploy --config="$PRISMA_CONFIG"
 ```
 
 Cette commande applique seulement les migrations versionnées en attente, sans créer de nouvelle migration ni réinitialiser la base. `npx` télécharge Prisma s'il n'est pas déjà dans le cache du compte PH; le serveur doit donc pouvoir accéder au registre npm. Si la commande échoue, arrêter et transmettre l'erreur non sensible au lieu de la relancer à l'aveugle. Après réussite, redémarrer Passenger pour l'application test.
 
 ## Précautions
 
-1. Confirmer que le dernier déploiement de test est complet et qu'il contient le moteur Prisma compatible avec PlanetHoster.
+1. Confirmer que le dernier déploiement de test est complet et contient le client Prisma compilé ainsi que l'adapter PostgreSQL; le client Prisma 7 ne dépend pas d'un moteur Query Engine natif à sélectionner pour PH.
 2. Créer une sauvegarde restaurable de la base **de test** avant toute écriture.
 3. Utiliser uniquement `SERVER_DEPLOY_ROOT/test`, le runtime de test et l'URL `DATABASE_URL` du secret `KG_PAY_APP_ENV` de l'environnement GitHub `test`.
 4. Ne jamais afficher, coller dans une commande, envoyer dans un message ou journaliser `DATABASE_URL`.
@@ -57,9 +57,11 @@ fi
 
 RELEASE_DIR="$DEPLOY_ROOT/local-builds/$RELEASE_ID"
 SCHEMA="$REPOSITORY/services/auth-service/prisma/schema.prisma"
+PRISMA_CONFIG="$REPOSITORY/services/auth-service/prisma.config.ts"
 
 test -f "$RELEASE_DIR/manifest.json"
 test -f "$SCHEMA"
+test -f "$PRISMA_CONFIG"
 test -f "$REPOSITORY/services/auth-service/prisma/migrations/migration_lock.toml"
 
 DEPLOYED_COMMIT="$(node -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).commit)' "$RELEASE_DIR/manifest.json")"
@@ -76,16 +78,14 @@ Prendre `RELEASE_ID` dans le chemin de la release du journal, au format UTC `YYY
 
 ## 2. Vérifier la cible de migration
 
-Après avoir vérifié la sauvegarde, saisir l'URL de **la base test** dans l'invite masquée. Utiliser la valeur de `DATABASE_URL__AUTH_SERVICE` du `KG_PAY_APP_ENV` configuré pour l'environnement GitHub `test`. Ne pas la remplacer par l'URL de production.
+Après avoir vérifié la sauvegarde, utiliser le runtime privé de l'application **test**, qui contient la valeur issue de `DATABASE_URL__AUTH_SERVICE` du `KG_PAY_APP_ENV test`. Ne pas utiliser le runtime de production.
 
 ```bash
-read -r -s -p "DATABASE_URL de la base TEST : " DATABASE_URL
-printf '\n'
-export DATABASE_URL
-trap 'unset DATABASE_URL' EXIT
+KG_PAY_ENV_FILE="/chemin/absolu/privé/auth-service-test/.generated/env/auth-service.env"
+test -s "$KG_PAY_ENV_FILE"
+export KG_PAY_ENV_FILE
 
-npm exec --yes --package=prisma@6.19.3 -- \
-  prisma migrate status --schema "$SCHEMA"
+npx --yes prisma@7.8.0 migrate status --config="$PRISMA_CONFIG"
 ```
 
 Examiner le résultat. Il doit correspondre à la base de test et aux migrations présentes dans la release vérifiée. Le journal précédent mentionne le schéma PostgreSQL `test` (`test.Role`) ; si la commande indique un autre schéma, ou aucune migration alors que la table reste absente, arrêter et vérifier l'URL et le paramètre `schema` avant toute écriture.
@@ -95,14 +95,11 @@ Examiner le résultat. Il doit correspondre à la base de test et aux migrations
 Seulement après confirmation de la cible test et de la sauvegarde :
 
 ```bash
-npm exec --yes --package=prisma@6.19.3 -- \
-  prisma migrate deploy --schema "$SCHEMA"
+npx --yes prisma@7.8.0 migrate deploy --config="$PRISMA_CONFIG"
 
-npm exec --yes --package=prisma@6.19.3 -- \
-  prisma migrate status --schema "$SCHEMA"
+npx --yes prisma@7.8.0 migrate status --config="$PRISMA_CONFIG"
 
-unset DATABASE_URL
-trap - EXIT
+unset KG_PAY_ENV_FILE
 ```
 
 `migrate deploy` applique les migrations versionnées encore en attente. Ne pas utiliser `migrate dev`, `migrate reset` ou `db push`. En cas d'erreur, arrêter et conserver le message non sensible pour diagnostic ; ne pas relancer à l'aveugle.

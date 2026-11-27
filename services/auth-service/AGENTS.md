@@ -3,7 +3,7 @@
 ## KG Pay constraints
 
 - Follow the repository-root `AGENTS.md`, `README.md`, and validated CDC-01; those sources take precedence over this generated starter guidance.
-- Do not add NestJS Observe or other external telemetry without the project owner's explicit approval. Never commit credentials or write them to logs or generated instructions. Local secrets may be stored in the ignored repository-root `.env` and generated runtime env, never in build env or artifacts.
+- Do not add NestJS Observe or other external telemetry without the project owner's explicit approval. Never commit credentials or write them to logs or generated instructions. Local secrets may be stored in the ignored repository-root `.env` and generated workspace env, never in artifacts.
 - Use NestJS with Express, strict TypeScript, PostgreSQL, and Prisma as recorded in CDC-01.
 - Keep the API as the authority for identity, MFA, permissions, and resource ownership. Require a verified email OTP after the password for every new CUSTOMER and STAFF login. Never log the OTP or issue a complete session before verification.
 - Built-in roles are CUSTOMER, GLOBAL_SUPER_ADMIN, OPERATIONS_ADMIN, and CONFIGURATION_ADMIN. Custom roles may use only the closed permission catalog; only GLOBAL_SUPER_ADMIN manages identities and roles. RP-10 must remain enforced independently of role permissions.

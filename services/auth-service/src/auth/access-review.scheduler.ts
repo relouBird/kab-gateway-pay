@@ -5,7 +5,7 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
-import { IdentityStatus, Prisma } from '@prisma/client';
+import { IdentityStatus, Prisma } from '@prisma/generated';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
 import { appendAuditEvent } from '../security/audit.service';
