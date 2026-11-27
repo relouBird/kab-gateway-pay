@@ -119,3 +119,25 @@
   - `git diff --check` — réussi.
 - **Points ouverts :** produire puis démarrer une release test sur PlanetHoster; ne pas relancer la release courante sans inclure ce nouveau moteur.
 - **Suite attendue :** valider que le moteur `debian-openssl-1.1.x` est généré et empaqueté, puis publier le correctif sur `test` et redéployer.
+
+## Entrée du 26 novembre 2026 — Guide de migration de la base test PH
+
+- **Objectif :** fournir une procédure opérationnelle à partir de l'erreur `P2021` indiquant que `test.Role` n'existe pas.
+- **Statut :** guide créé ; aucune migration distante exécutée.
+- **Résumé :** le document sépare le défaut du Query Engine Prisma de l'absence de migrations dans la base test, confirme les contrôles de release et de sauvegarde, décrit l'inspection puis l'application avec `prisma migrate deploy`, et rappelle le bootstrap éventuel du premier administrateur.
+- **Fichiers modifiés :** `PLANETHOSTER-MIGRATION-TEST.md`, `docs/journal/2026-11-26/BASE.md`.
+- **Références :** CDC-01 §11.12 (démarrage avec configuration runtime valide), ADR-001 §5 (environnements séparés), [`docs/deployment/planethoster-manual-migrations.md`](../deployment/planethoster-manual-migrations.md).
+- **Validations exécutées :** documentation uniquement; aucune connexion serveur ou commande de migration exécutée par l'agent.
+- **Points ouverts :** l'opérateur doit confirmer la sauvegarde, les valeurs test, l'identifiant de release et le statut des migrations avant de lancer `migrate deploy`.
+- **Suite attendue :** suivre le guide depuis une session SSH privée, puis vérifier le redémarrage Passenger test.
+
+## Entrée du 26 novembre 2026 — Raccourci pour migration test
+
+- **Objectif :** rendre l'action courante plus simple sans exposer l'URL de base.
+- **Statut :** guide simplifié.
+- **Résumé :** ajout d'un chemin court qui charge le runtime test avec Node `--env-file`, puis lance `npx prisma migrate deploy` directement sur le schéma du clone de test.
+- **Fichiers modifiés :** `PLANETHOSTER-MIGRATION-TEST.md`, `docs/journal/2026-11-26/BASE.md`.
+- **Références :** CDC-01 §11.12; `P2021` sur `test.Role`.
+- **Validations exécutées :** documentation uniquement; aucune connexion serveur ni migration exécutée.
+- **Points ouverts :** sauvegarde et vérification de l'environnement test restent nécessaires avant la commande.
+- **Suite attendue :** exécuter le chemin court sur le serveur test puis confirmer que Passenger démarre.
