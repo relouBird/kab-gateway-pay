@@ -47,3 +47,14 @@
   - Vérification des noms sous `.generated/env/` et absence de `.env` dans les bundles des portails — réussies sans afficher de valeurs d'environnement.
 - **Points ouverts :** le déploiement, le démarrage Passenger et les commandes `npx` restent à valider sur l'environnement PlanetHoster de test après sauvegarde. Aucune migration distante ni recette Maildev n'a été exécutée. Le résidu synthétique antérieur dans la base locale `public` est conservé conformément à la demande précédente.
 - **Suite attendue :** faire la recette des migrations et du bootstrap sur PlanetHoster test; confirmer que Passenger trouve automatiquement `auth-service.env` et que `KG_PAY_ENV_FILE` suffit pour les commandes depuis le clone source.
+
+## Correctif du contrôle du paquet dans GitHub Actions
+
+- **Objectif :** corriger l'échec du job de déploiement après la compilation d'`argon2`.
+- **Statut :** correctif local terminé; le job GitHub Actions doit être relancé pour confirmation.
+- **Résumé :** Bash développait `$connect` et `$disconnect` dans le JavaScript transmis par `node -e "..."`. Avec `set -u`, `$connect` provoquait `connect: unbound variable`. Le JavaScript est maintenant transmis par un heredoc à délimiteur cité, sans expansion par le shell.
+- **Chemins modifiés :** `.github/workflows/deploy-planet-host.yml`, `docs/journal/2026-11-27/ADR-001-monorepo-microservices.md`.
+- **Exigences/sections concernées :** contrôle de chargement du paquet `auth-service` dans le workflow de déploiement; aucune règle métier ou exigence CDC modifiée.
+- **Validations :** test Bash/Node ciblé confirmant que `prisma.$connect` reste littéral — réussi; `pnpm exec prettier --check .github/workflows/deploy-planet-host.yml` — réussi; `git diff --check` — réussi.
+- **Point ouvert :** le workflow complet et la production de l'archive n'ont pas été réexécutés; l'avis npm de nouvelle version n'était pas la cause de l'échec.
+- **Suite attendue :** relancer le job GitHub Actions et vérifier qu'il passe le contrôle Prisma puis la suite du packaging/déploiement.

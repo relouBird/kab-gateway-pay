@@ -11,10 +11,10 @@ Le changement antérieur du moteur Prisma ne modifie pas le schéma SQL et ne de
 Après avoir confirmé la sauvegarde de la base test et le dernier déploiement, ouvrir une session SSH et remplacer les deux chemins par ceux de test. Le runtime privé contient déjà le `DATABASE_URL` test; il est chargé par Node sans être affiché dans le terminal.
 
 ```bash
-source "$HOME/nodevenv/<environnement-node-du-deploiement>/22/bin/activate"
+source /home/tfrtbadvag/nodevenv/kgpay_deploy/22/bin/activate
 
-DEPLOY_ROOT="/chemin/absolu/privé/kgpay_deploy/test"
-AUTH_APP_ROOT="/chemin/absolu/privé/auth-service-test"
+DEPLOY_ROOT="/home/tfrtbadvag/kgpay_deploy/test"
+AUTH_APP_ROOT="/home/tfrtbadvag/kgservices-test/auth-service"
 SCHEMA="$DEPLOY_ROOT/repository/services/auth-service/prisma/schema.prisma"
 SERVICE_ENV="$AUTH_APP_ROOT/.generated/env/auth-service.env"
 PRISMA_CONFIG="$DEPLOY_ROOT/repository/services/auth-service/prisma.config.ts"
@@ -43,12 +43,12 @@ Ouvrir une session SSH privée. Remplacer les chemins entre chevrons par les val
 
 ```bash
 set -e
-source "$HOME/nodevenv/kgpay_deploy/22/bin/activate"
+source /home/tfrtbadvag/nodevenv/kgpay_deploy/22/bin/activate
 node --version
 
-DEPLOY_ROOT="/chemin/absolu/privé/kgpay_deploy/test"
+DEPLOY_ROOT="/home/tfrtbadvag/kgpay_deploy/test"
 REPOSITORY="$DEPLOY_ROOT/repository"
-RELEASE_ID="20261126T124054Z"
+RELEASE_ID="20261126T124054Z" # Verifier l'id de la derniere release
 
 if [[ ! "$RELEASE_ID" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]; then
   echo "Identifiant de release invalide."
@@ -81,7 +81,7 @@ Prendre `RELEASE_ID` dans le chemin de la release du journal, au format UTC `YYY
 Après avoir vérifié la sauvegarde, utiliser le runtime privé de l'application **test**, qui contient la valeur issue de `DATABASE_URL__AUTH_SERVICE` du `KG_PAY_APP_ENV test`. Ne pas utiliser le runtime de production.
 
 ```bash
-KG_PAY_ENV_FILE="/chemin/absolu/privé/auth-service-test/.generated/env/auth-service.env"
+KG_PAY_ENV_FILE="/home/tfrtbadvag/kgservices-test/auth-service/.generated/env/auth-service.env"
 test -s "$KG_PAY_ENV_FILE"
 export KG_PAY_ENV_FILE
 
@@ -111,7 +111,7 @@ Si c'est le premier démarrage de cette base et que le premier `GLOBAL_SUPER_ADM
 Ensuite, redémarrer l'application Node.js CloudLinux **test** avec son APP_ROOT test :
 
 ```bash
-AUTH_APP_ROOT="/chemin/absolu/privé/auth-service-test"
+AUTH_APP_ROOT="/home/tfrtbadvag/kgservices-test/auth-service"
 /usr/sbin/cloudlinux-selector restart \
   --json \
   --interpreter=nodejs \
