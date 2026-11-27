@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/generated';
 
 export const EVENT_PUBLISHER = Symbol('EVENT_PUBLISHER');
 

@@ -84,15 +84,7 @@ function readSchema(schemaPath, workspaceName) {
     fail(`${workspaceName}/env.schema.json must declare properties.`);
   }
 
-  for (const listName of [
-    "requiredKeys",
-    "sharedKeys",
-    "runtimeOnlyKeys",
-    "runtimeRequiredKeys",
-  ]) {
-    if (schema[listName] === undefined && listName.startsWith("runtime")) {
-      schema[listName] = [];
-    }
+  for (const listName of ["requiredKeys", "sharedKeys"]) {
     if (!Array.isArray(schema[listName])) {
       fail(
         `${workspaceName}/env.schema.json must declare ${listName} as an array.`,
@@ -112,15 +104,6 @@ function readSchema(schemaPath, workspaceName) {
     !keyPattern.test(schema.targetPrefix)
   ) {
     fail(`${workspaceName}/env.schema.json must declare a valid targetPrefix.`);
-  }
-
-  const runtimeOnlyKeys = new Set(schema.runtimeOnlyKeys);
-  for (const key of schema.runtimeRequiredKeys) {
-    if (!runtimeOnlyKeys.has(key)) {
-      fail(
-        `${workspaceName}/env.schema.json marks ${key} runtime-required but not runtime-only.`,
-      );
-    }
   }
 
   for (const key of Object.keys(properties)) {
@@ -226,16 +209,11 @@ function serializeValue(value) {
 
 function generateEnvironments({
   rootDir,
-  mode,
   targetName,
   hostEnv = process.env,
   sourceFile,
   outputDir,
 }) {
-  if (mode !== "build" && mode !== "runtime") {
-    fail('Environment mode must be "build" or "runtime".');
-  }
-
   const targets = discoverTargets(rootDir);
   if (!targets.length) fail("No workspace env.schema.json files were found.");
 
@@ -277,11 +255,7 @@ function generateEnvironments({
 
   const generated = selectedTargets.map((target) => {
     const { schema, workspaceName } = target;
-    const runtimeOnlyKeys = new Set(schema.runtimeOnlyKeys);
-    const requiredKeys = new Set([
-      ...schema.requiredKeys,
-      ...(mode === "runtime" ? schema.runtimeRequiredKeys : []),
-    ]);
+    const requiredKeys = new Set(schema.requiredKeys);
     const values = new Map();
 
     for (const [key, definition] of Object.entries(schema.properties)) {
@@ -293,12 +267,9 @@ function generateEnvironments({
             ? hostEnv[sourceKey]
             : fileValues.get(sourceKey);
 
-      if (mode === "build" && runtimeOnlyKeys.has(key)) continue;
       if (value === undefined || (value === "" && !definition.allowEmpty)) {
         if (requiredKeys.has(key)) {
-          fail(
-            `${sourceKey} is required for ${workspaceName} ${mode} configuration.`,
-          );
+          fail(`${sourceKey} is required for ${workspaceName} configuration.`);
         }
         continue;
       }
@@ -312,7 +283,8 @@ function generateEnvironments({
       .join("\n");
     const targetId = path.basename(workspaceName);
     return {
-      path: path.join(generatedDir, `${targetId}.${mode}.env`),
+      path: path.join(generatedDir, `${targetId}.env`),
+      targetId,
       workspaceName,
       output: `${output}\n`,
     };
@@ -324,6 +296,12 @@ function generateEnvironments({
       encoding: "utf8",
       mode: 0o600,
     });
+    for (const obsoleteMode of ["build", "runtime"]) {
+      fs.rmSync(
+        path.join(generatedDir, `${result.targetId}.${obsoleteMode}.env`),
+        { force: true },
+      );
+    }
   }
 
   return generated.map(({ path: outputPath, workspaceName }) => ({
@@ -338,7 +316,6 @@ function parseArguments(args) {
     const option = args[index];
     if (
       option === "--target" ||
-      option === "--mode" ||
       option === "--source-file" ||
       option === "--output-dir"
     ) {
@@ -361,14 +338,12 @@ function parseArguments(args) {
 function main() {
   const rootDir = path.resolve(__dirname, "..");
   const {
-    mode,
     target: targetName,
     sourceFile,
     outputDir,
   } = parseArguments(process.argv.slice(2));
   const generated = generateEnvironments({
     rootDir,
-    mode: mode || "build",
     targetName,
     sourceFile,
     outputDir,

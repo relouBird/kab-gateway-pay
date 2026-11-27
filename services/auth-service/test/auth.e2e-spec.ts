@@ -12,6 +12,7 @@ import { AppModule } from '../src/app.module';
 import { AuthService } from '../src/auth/auth.service';
 import { ApiExceptionFilter } from '../src/common/api-exception.filter';
 import { correlationMiddleware } from '../src/common/correlation.middleware';
+import { PrismaService } from '../src/database/prisma.service';
 
 const describeIntegration = process.env.AUTH_E2E_DATABASE_URL
   ? describe
@@ -57,6 +58,27 @@ describeIntegration('Auth API (isolated integration e2e)', () => {
     );
     app.useGlobalFilters(new ApiExceptionFilter());
     await app.init();
+
+    const e2eDatabaseUrl = process.env.AUTH_E2E_DATABASE_URL;
+    if (!e2eDatabaseUrl) {
+      throw new Error('The isolated e2e database URL is required.');
+    }
+    const expectedSchema = new URL(e2eDatabaseUrl).searchParams.get('schema');
+    if (!expectedSchema || !/^kgpay_e2e_[0-9a-f]{32}$/.test(expectedSchema)) {
+      throw new Error('A valid isolated e2e database schema is required.');
+    }
+    const prisma = app.get(PrismaService);
+    const isolationKey = `PRISMA_SCHEMA_CHECK_${randomUUID()}`;
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "${expectedSchema}"."SystemSetting" ("key", "value", "updatedAt") VALUES ($1, $2, NOW())`,
+      isolationKey,
+      'isolated',
+    );
+    const isolationSetting = await prisma.systemSetting.findUnique({
+      where: { key: isolationKey },
+      select: { value: true },
+    });
+    expect(isolationSetting?.value).toBe('isolated');
   });
 
   afterAll(async () => {

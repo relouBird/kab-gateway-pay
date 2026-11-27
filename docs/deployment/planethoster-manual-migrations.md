@@ -21,7 +21,9 @@ DEPLOYED_COMMIT="$(node -e 'process.stdout.write(JSON.parse(require("node:fs").r
 SOURCE_COMMIT="$(git -C "$REPOSITORY" rev-parse HEAD)"
 test "$SOURCE_COMMIT" = "$DEPLOYED_COMMIT"
 
+PRISMA_CONFIG="$REPOSITORY/services/auth-service/prisma.config.ts"
 SCHEMA="$REPOSITORY/services/auth-service/prisma/schema.prisma"
+test -f "$PRISMA_CONFIG"
 test -f "$SCHEMA"
 test -f "$REPOSITORY/services/auth-service/prisma/migrations/migration_lock.toml"
 ```
@@ -38,39 +40,40 @@ source "$HOME/nodevenv/<application-deploy>/22/bin/activate"
 
 DEPLOY_ROOT="/chemin/absolu/privé/kgpay"
 REPOSITORY="$DEPLOY_ROOT/repository"
+AUTH_APP_ROOT="/chemin/absolu/privé/auth-service"
+PRISMA_CONFIG="$REPOSITORY/services/auth-service/prisma.config.ts"
 SCHEMA="$REPOSITORY/services/auth-service/prisma/schema.prisma"
+SERVICE_ENV_FILE="$AUTH_APP_ROOT/.generated/env/auth-service.env"
+test -f "$PRISMA_CONFIG"
 test -f "$SCHEMA"
+test -s "$SERVICE_ENV_FILE"
 ```
 
-Après vérification de la sauvegarde et de la release, saisir `DATABASE_URL` dans l'invite masquée. La valeur n'est ni passée comme argument de processus ni écrite dans l'historique du shell :
+Après vérification de la sauvegarde et de la release, exporter le chemin du fichier privé. Prisma Config utilise le loader partagé avec `auth-service` et charge les variables de ce fichier dans le processus Prisma :
 
 ```bash
-read -r -s -p "DATABASE_URL de l'environnement ciblé : " DATABASE_URL
-printf '\n'
-export DATABASE_URL
-trap 'unset DATABASE_URL' EXIT
+export KG_PAY_ENV_FILE="$SERVICE_ENV_FILE"
 
-npm exec --yes --package=prisma@6.19.3 -- \
-  prisma migrate status --schema "$SCHEMA"
+npx --yes prisma@7.8.0 migrate status --config="$PRISMA_CONFIG"
 ```
 
 Relire le résultat et confirmer qu'il s'agit bien de la base de l'environnement ciblé. Utiliser une base de test distincte pour l'environnement `test`; ne pas remplacer son URL par celle de production. Seulement après cette confirmation, appliquer les migrations en attente :
 
 ```bash
-npm exec --yes --package=prisma@6.19.3 -- \
-  prisma migrate deploy --schema "$SCHEMA"
-unset DATABASE_URL
-trap - EXIT
+npx --yes prisma@7.8.0 migrate deploy --config="$PRISMA_CONFIG"
+
+npx --yes prisma@7.8.0 migrate status --config="$PRISMA_CONFIG"
+unset KG_PAY_ENV_FILE
 ```
 
 `migrate deploy` applique les migrations versionnées en attente; il ne crée pas de sauvegarde et ne fournit pas de rollback. Ne pas remplacer cette commande par `migrate dev`, `migrate reset` ou `db push`. En cas d'échec, arrêter la procédure, conserver le message d'erreur non sensible et faire analyser l'état de la base avant toute nouvelle tentative.
 
 ## Sécurité et limites
 
-- Utiliser le Node environment de déploiement configuré sur PH; Prisma est lancé temporairement avec npm depuis les sources clonées, sans pnpm ni installation dans le dépôt.
-- Ne pas afficher, copier dans une commande, committer ou journaliser l'URL de base. La saisie masquée ne doit être faite que dans une session SSH privée.
+- Utiliser le Node environment de déploiement configuré sur PH; Prisma 7.8.0 est lancé temporairement avec npm depuis les sources clonées, sans pnpm ni installation dans le dépôt.
+- Le fichier d'environnement privé reste dans l'APP_ROOT et n'est pas copié dans le clone. Prisma Config et l'application utilisent le même loader; ne pas afficher, copier dans une commande, committer ou journaliser les valeurs de configuration.
 - Ne pas copier `.env.prod` sur `.env` et ne pas transférer un fichier `.env` dans l'archive.
-- Les noms de variables de la configuration locale peuvent différer : le schéma Prisma déployé attend `DATABASE_URL`.
+- La configuration locale utilise le fichier généré depuis le `.env` racine; sur PH, `KG_PAY_ENV_FILE` désigne le fichier privé `auth-service.env`.
 - L'accès réseau de PH au registre npm et à PostgreSQL doit être vérifié avant la première opération.
 - Choisir l'ordre migration/déploiement selon la compatibilité de la migration et du code; le workflow ne le devine pas et ne coordonne pas cette décision.
 
@@ -85,7 +88,7 @@ set -e
 AUTH_APP_ROOT="/chemin/absolu/privé/auth-service"
 source "/chemin/absolu/nodevenv/auth-service/22/bin/activate"
 set -u
-export RUNTIME_ENV_FILE="$AUTH_APP_ROOT/.generated/env/auth-service.runtime.env"
+export KG_PAY_ENV_FILE="$AUTH_APP_ROOT/.generated/env/auth-service.env"
 cd "$AUTH_APP_ROOT/runtime"
 test -s dist/cli/bootstrap-super-admin.js
 node dist/cli/bootstrap-super-admin.js

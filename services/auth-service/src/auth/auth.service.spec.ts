@@ -1,6 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { jest as jestApi } from '@jest/globals';
-import { IdentityStatus, OtpPurpose } from '@prisma/client';
+import { IdentityStatus, OtpPurpose } from '@prisma/generated';
 import { AuditService } from '../security/audit.service';
 import { InvitationEmailService } from '../email-otp/invitation-email.service';
 import { PrismaService } from '../database/prisma.service';
