@@ -165,20 +165,20 @@ jobs:
           (
             cd "$release_dir/services/auth-service"
             test ! -e .env
-            node -e "
-              require('@kgpay/contracts');
-              require('@nestjs/core');
-              require('argon2');
-              const { PrismaClient } = require('./dist/generated/prisma/client.js');
-              const { PrismaPg } = require('@prisma/adapter-pg');
-              const adapter = new PrismaPg({
-                connectionString: 'postgresql://build:synthetic@127.0.0.1:5432/kgpay',
-                connectionTimeoutMillis: 1000,
-              });
-              const prisma = new PrismaClient({ adapter });
-              if (typeof prisma.$connect !== 'function') process.exit(1);
-              prisma.$disconnect().catch(() => { process.exitCode = 1; });
-            "
+            node <<'NODE'
+          require('@kgpay/contracts');
+          require('@nestjs/core');
+          require('argon2');
+          const { PrismaClient } = require('./dist/generated/prisma/client.js');
+          const { PrismaPg } = require('@prisma/adapter-pg');
+          const adapter = new PrismaPg({
+            connectionString: 'postgresql://build:synthetic@127.0.0.1:5432/kgpay',
+            connectionTimeoutMillis: 1000,
+          });
+          const prisma = new PrismaClient({ adapter });
+          if (typeof prisma.$connect !== 'function') process.exit(1);
+          prisma.$disconnect().catch(() => { process.exitCode = 1; });
+          NODE
           )
 
           test -f "$release_dir/packages/contracts/dist/index.js"
