@@ -7,6 +7,7 @@ import { TokenService } from './token.service';
 
 describe('TokenService', () => {
   const environmentKeys = [
+    'DATABASE_URL',
     'JWT_SIGNING_SECRET',
     'JWT_SIGNING_PREVIOUS_SECRETS_JSON',
   ] as const;
@@ -18,6 +19,7 @@ describe('TokenService', () => {
 
   beforeEach(() => {
     signingSecret = randomBytes(64).toString('base64url');
+    process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/kgpay';
     process.env.JWT_SIGNING_SECRET = signingSecret;
     delete process.env.JWT_SIGNING_PREVIOUS_SECRETS_JSON;
     tokens = new TokenService(new PrismaService(), validAuthConfig());

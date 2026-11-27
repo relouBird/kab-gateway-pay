@@ -11,7 +11,7 @@ import {
   randomUUID,
   timingSafeEqual,
 } from 'node:crypto';
-import { OtpPurpose } from '@prisma/client';
+import { OtpPurpose } from '@prisma/generated';
 import { EmailOtpService } from '../email-otp/email-otp.service';
 import { PrismaService } from '../database/prisma.service';
 import type { AuthConfig } from '../config/auth.config';

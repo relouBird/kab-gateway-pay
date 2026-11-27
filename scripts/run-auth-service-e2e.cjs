@@ -2,29 +2,37 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { randomUUID } = require("node:crypto");
+const { randomBytes, randomUUID } = require("node:crypto");
 const { createRequire } = require("node:module");
 const { spawnSync } = require("node:child_process");
 
 const rootDir = path.resolve(__dirname, "..");
 const serviceDir = path.join(rootDir, "services", "auth-service");
 const maildevMode = process.argv.includes("--maildev");
-const runtimeEnv = path.join(
-  rootDir,
-  ".generated",
-  "env",
-  "auth-service.runtime.env",
-);
+const serviceEnv = path.join(rootDir, ".generated", "env", "auth-service.env");
 
 class RunnerError extends Error {}
 
 async function main() {
-  if (!fs.existsSync(runtimeEnv)) {
+  const generated = spawnSync(
+    process.execPath,
+    [
+      path.join(rootDir, "scripts", "generate-env.cjs"),
+      "--target",
+      "auth-service",
+    ],
+    { cwd: rootDir, stdio: "inherit" },
+  );
+  if (generated.error) throw generated.error;
+  if (generated.status !== 0) {
     throw new RunnerError(
-      "Generate the runtime environment before running e2e.",
+      `Generating the auth-service environment failed with exit code ${generated.status}.`,
     );
   }
-  process.loadEnvFile(runtimeEnv);
+  if (!fs.existsSync(serviceEnv)) {
+    throw new RunnerError("The generated auth-service environment is missing.");
+  }
+  process.loadEnvFile(serviceEnv);
 
   const configuredUrl = process.env.DATABASE_URL;
   if (!configuredUrl) throw new RunnerError("DATABASE_URL is required.");
@@ -47,15 +55,16 @@ async function main() {
   const requireFromService = createRequire(
     path.join(serviceDir, "package.json"),
   );
-  const { PrismaClient } = requireFromService("@prisma/client");
-  const prisma = new PrismaClient({
-    datasources: { db: { url: adminUrl.toString() } },
+  const { Pool } = requireFromService("pg");
+  const pool = new Pool({
+    connectionString: adminUrl.toString(),
+    connectionTimeoutMillis: 5_000,
   });
 
   let schemaCreated = false;
   let testExitCode = 1;
   try {
-    await prisma.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
+    await pool.query(`CREATE SCHEMA "${schema}"`);
     schemaCreated = true;
     process.stdout.write(`Created isolated e2e schema ${schema}.\n`);
 
@@ -64,11 +73,27 @@ async function main() {
       AUTH_E2E_MAILDEV: maildevMode ? "true" : "false",
       AUTH_E2E_DATABASE_URL: testUrl.toString(),
       DATABASE_URL: testUrl.toString(),
+      JWT_SIGNING_SECRET: randomBytes(48).toString("base64url"),
+      KG_PAY_ENV_FILE: serviceEnv,
     };
+    const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
     const migration = spawnSync(
-      process.execPath,
-      [path.join(rootDir, "scripts", "run-prisma.cjs"), "migrate", "deploy"],
-      { cwd: rootDir, env, stdio: "inherit" },
+      pnpmCommand,
+      [
+        "--filter",
+        "auth-service",
+        "exec",
+        "prisma",
+        "migrate",
+        "deploy",
+        "--config=prisma.config.ts",
+      ],
+      {
+        cwd: rootDir,
+        env,
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      },
     );
     if (migration.error) throw migration.error;
     if (migration.status !== 0) {
@@ -92,6 +117,7 @@ async function main() {
         "--config",
         "./test/jest-e2e.json",
         "--runInBand",
+        "--forceExit",
         "--runTestsByPath",
         maildevMode ? "./test/maildev.e2e-spec.ts" : "./test/auth.e2e-spec.ts",
       ],
@@ -102,11 +128,11 @@ async function main() {
   } finally {
     try {
       if (schemaCreated) {
-        await prisma.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);
+        await pool.query(`DROP SCHEMA "${schema}" CASCADE`);
         process.stdout.write(`Dropped isolated e2e schema ${schema}.\n`);
       }
     } finally {
-      await prisma.$disconnect();
+      await pool.end();
     }
   }
 

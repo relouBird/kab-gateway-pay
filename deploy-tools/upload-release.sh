@@ -82,15 +82,15 @@ if [[ ! -s "$RUNNER_TEMP/deploy_key" ]]; then
 fi
 
 archive="$RUNNER_TEMP/kgpay-build.tar.gz"
-runtime_env="$RUNNER_TEMP/kgpay-auth-service-runtime.env"
+service_env="$RUNNER_TEMP/kgpay-auth-service.env"
 manager="$GITHUB_WORKSPACE/deploy-tools/release-manager.cjs"
 portal_publisher="$GITHUB_WORKSPACE/deploy-tools/publish-portals.cjs"
 if [[ ! -f "$archive" ]]; then
   echo "::error::The packaged release archive is missing on the runner."
   exit 1
 fi
-if [[ ! -s "$runtime_env" ]]; then
-  echo "::error::The generated auth-service runtime environment is missing on the runner."
+if [[ ! -s "$service_env" ]]; then
+  echo "::error::The generated auth-service environment is missing on the runner."
   exit 1
 fi
 if [[ ! -f "$manager" || ! -f "$portal_publisher" ]]; then
@@ -100,7 +100,7 @@ fi
 
 remote="$SERVER_USER@$SERVER_HOST"
 archive_name="kgpay-build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
-runtime_env_name="auth-service-runtime-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.env"
+service_env_name="auth-service-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.env"
 manager_name="release-manager-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.cjs"
 publisher_name="portal-publisher-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.cjs"
 
@@ -142,6 +142,6 @@ scp -p -i "$RUNNER_TEMP/deploy_key" \
   -o BatchMode=yes \
   -o StrictHostKeyChecking=no \
   -o UserKnownHostsFile=/dev/null \
-  "$runtime_env" "$remote:$SERVER_DEPLOY_ROOT/incoming/$runtime_env_name"
+  "$service_env" "$remote:$SERVER_DEPLOY_ROOT/incoming/$service_env_name"
 
-echo "Uploaded release archive, runtime environment, and deployment helpers to PlanetHoster."
+echo "Uploaded release archive, service environment, and deployment helpers to PlanetHoster."
