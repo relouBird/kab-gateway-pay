@@ -13,7 +13,7 @@ fi
 
 remote="$SERVER_USER@$SERVER_HOST"
 archive_name="kgpay-build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
-runtime_env_name="auth-service-runtime-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.env"
+service_env_name="auth-service-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.env"
 manager_name="release-manager-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.cjs"
 publisher_name="portal-publisher-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.cjs"
 
@@ -27,7 +27,7 @@ printf -v deploy_command 'bash -s -- %q %q %q %q %q %q %q %q %q %q %q %q %q' \
   "$archive_name" \
   "$manager_name" \
   "$publisher_name" \
-  "$runtime_env_name" \
+  "$service_env_name" \
   "$REPOSITORY" \
   "$DEPLOY_MODE" \
   "$DEPLOY_BRANCH"

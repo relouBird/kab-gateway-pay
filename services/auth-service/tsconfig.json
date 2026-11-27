@@ -12,6 +12,10 @@
     "allowSyntheticDefaultImports": true,
     "target": "ES2023",
     "types": ["node", "jest"],
+    "paths": {
+      "@prisma/generated": ["./src/generated/prisma/client.ts"],
+      "src/*": ["./src/*"]
+    },
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": ".",

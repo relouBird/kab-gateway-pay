@@ -7,13 +7,13 @@ import { AuthModule } from './auth/auth.module';
 import { correlationMiddleware } from './common/correlation.middleware';
 import { ApiExceptionFilter } from './common/api-exception.filter';
 import { AUTH_CONFIG } from './config/auth.config';
-import { loadRuntimeEnvironment } from './config/runtime-env';
+import { loadEnvironment } from './config/environment';
 import type { AuthConfig } from './config/auth.config';
 import { AppModule } from './app.module';
 import { normalizeOpenApiSecurity } from './common/openapi-security';
 
 async function bootstrap() {
-  loadRuntimeEnvironment();
+  loadEnvironment();
   const app = await NestFactory.create(AppModule);
   const config = app.select(AuthModule).get<AuthConfig>(AUTH_CONFIG);
   app.use(cookieParser());

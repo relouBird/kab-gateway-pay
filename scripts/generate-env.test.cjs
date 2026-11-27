@@ -25,11 +25,9 @@ function createWorkspace(t) {
         OTP_HASH_KEY: { type: "string", minLength: 32 },
         PORT: { type: "integer", minimum: 1, maximum: 65535 },
       },
-      requiredKeys: ["NODE_ENV", "PORT"],
+      requiredKeys: ["NODE_ENV", "PORT", "DATABASE_URL", "OTP_HASH_KEY"],
       sharedKeys: ["NODE_ENV"],
       targetPrefix: "AUTH_SERVICE",
-      runtimeOnlyKeys: ["DATABASE_URL", "OTP_HASH_KEY"],
-      runtimeRequiredKeys: ["DATABASE_URL", "OTP_HASH_KEY"],
       forbiddenKeys: [],
       forbiddenKeyPatterns: [],
     }),
@@ -48,17 +46,16 @@ function createWorkspace(t) {
   return rootDir;
 }
 
-test("build output omits runtime secrets while runtime output maps target values", (t) => {
+test("generates one environment file with all required values", (t) => {
   const rootDir = createWorkspace(t);
-  const build = generateEnvironments({ rootDir, mode: "build" });
-  const buildEnv = fs.readFileSync(build[0].path, "utf8");
-
-  assert.match(buildEnv, /NODE_ENV=development/);
-  assert.match(buildEnv, /PORT=3000/);
-  assert.doesNotMatch(buildEnv, /DATABASE_URL|OTP_HASH_KEY/);
-
-  const runtime = generateEnvironments({ rootDir, mode: "runtime" });
-  const runtimeEnv = fs.readFileSync(runtime[0].path, "utf8");
+  const generated = generateEnvironments({ rootDir });
+  const runtimeEnv = fs.readFileSync(generated[0].path, "utf8");
+  assert.equal(
+    generated[0].path,
+    path.join(rootDir, ".generated", "env", "auth-service.env"),
+  );
+  assert.match(runtimeEnv, /NODE_ENV=development/);
+  assert.match(runtimeEnv, /PORT=3000/);
   assert.match(
     runtimeEnv,
     /DATABASE_URL="postgresql:\/\/kgpay@127\.0\.0\.1:5432\/kgpay_auth\?schema=public&sslmode=disable"/,
@@ -66,7 +63,7 @@ test("build output omits runtime secrets while runtime output maps target values
   assert.match(runtimeEnv, new RegExp(`OTP_HASH_KEY=${"a".repeat(64)}`));
 });
 
-test("runtime generation fails when a required runtime value is missing", (t) => {
+test("generation fails when a required value is missing", (t) => {
   const rootDir = createWorkspace(t);
   const envPath = path.join(rootDir, ".env");
   const env = fs
@@ -75,7 +72,7 @@ test("runtime generation fails when a required runtime value is missing", (t) =>
   fs.writeFileSync(envPath, env);
 
   assert.throws(
-    () => generateEnvironments({ rootDir, mode: "runtime" }),
+    () => generateEnvironments({ rootDir }),
     /OTP_HASH_KEY__AUTH_SERVICE is required/,
   );
 });
@@ -85,7 +82,7 @@ test("generation rejects source keys not declared by any workspace schema", (t) 
   fs.appendFileSync(path.join(rootDir, ".env"), "TYPO__AUTH_SERVICE=value\n");
 
   assert.throws(
-    () => generateEnvironments({ rootDir, mode: "build" }),
+    () => generateEnvironments({ rootDir }),
     /contains an unused key TYPO__AUTH_SERVICE/,
   );
 });
@@ -108,7 +105,7 @@ test("optional empty values bypass format validation but non-empty values are ch
 
   const envPath = path.join(rootDir, ".env");
   fs.appendFileSync(envPath, "STAFF_PORTAL_URL__AUTH_SERVICE=\n");
-  const generated = generateEnvironments({ rootDir, mode: "build" });
+  const generated = generateEnvironments({ rootDir });
   assert.match(fs.readFileSync(generated[0].path, "utf8"), /STAFF_PORTAL_URL=/);
 
   const invalidEnv = fs
@@ -119,7 +116,7 @@ test("optional empty values bypass format validation but non-empty values are ch
     );
   fs.writeFileSync(envPath, invalidEnv);
   assert.throws(
-    () => generateEnvironments({ rootDir, mode: "build" }),
+    () => generateEnvironments({ rootDir }),
     /has an invalid value format for STAFF_PORTAL_URL/,
   );
 });
@@ -128,6 +125,16 @@ test("an explicit source file takes precedence and writes to the selected direct
   const rootDir = createWorkspace(t);
   const sourceFile = path.join(rootDir, ".env.test");
   const outputDir = path.join(rootDir, "temporary-env");
+  const generatedDir = path.join(outputDir, "auth-service.env");
+  fs.mkdirSync(outputDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(outputDir, "auth-service.build.env"),
+    "OLD_BUILD=value\n",
+  );
+  fs.writeFileSync(
+    path.join(outputDir, "auth-service.runtime.env"),
+    "OLD_RUNTIME=value\n",
+  );
   const localEnvPath = path.join(rootDir, ".env");
   const localEnv = fs.readFileSync(localEnvPath, "utf8");
   const source = localEnv
@@ -137,7 +144,6 @@ test("an explicit source file takes precedence and writes to the selected direct
 
   const generated = generateEnvironments({
     rootDir,
-    mode: "runtime",
     sourceFile: ".env.test",
     outputDir: "temporary-env",
     hostEnv: {
@@ -146,13 +152,18 @@ test("an explicit source file takes precedence and writes to the selected direct
     },
   });
 
-  assert.equal(
-    generated[0].path,
-    path.join(outputDir, "auth-service.runtime.env"),
-  );
+  assert.equal(generated[0].path, generatedDir);
   const runtimeEnv = fs.readFileSync(generated[0].path, "utf8");
   assert.match(runtimeEnv, /NODE_ENV=test/);
   assert.match(runtimeEnv, /PORT=4000/);
+  assert.equal(
+    fs.existsSync(path.join(outputDir, "auth-service.build.env")),
+    false,
+  );
+  assert.equal(
+    fs.existsSync(path.join(outputDir, "auth-service.runtime.env")),
+    false,
+  );
   assert.equal(fs.existsSync(path.join(rootDir, ".generated")), false);
   assert.equal(fs.readFileSync(localEnvPath, "utf8"), localEnv);
 });
@@ -164,7 +175,6 @@ test("an explicitly selected source file must exist", (t) => {
     () =>
       generateEnvironments({
         rootDir,
-        mode: "runtime",
         sourceFile: ".env.prod",
       }),
     /Environment source file does not exist/,
@@ -174,15 +184,15 @@ test("an explicitly selected source file must exist", (t) => {
 test("environment CLI options map explicit source and output paths", () => {
   assert.deepEqual(
     parseArguments([
-      "--mode",
-      "runtime",
+      "--target",
+      "auth-service",
       "--source-file",
       ".env.test",
       "--output-dir",
       ".tmp/env",
     ]),
     {
-      mode: "runtime",
+      target: "auth-service",
       sourceFile: ".env.test",
       outputDir: ".tmp/env",
     },

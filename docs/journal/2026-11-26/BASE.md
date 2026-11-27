@@ -45,3 +45,99 @@
   - Exécution du workflow et démarrage sur PlanetHoster — en attente.
 - **Points ouverts :** exécuter une nouvelle release et vérifier que le marqueur confirme les smoke tests dans le conteneur, puis que le runtime publié charge `argon2` sur PH.
 - **Suite attendue :** relancer le déploiement avec cette correction; ne pas considérer le run précédent comme preuve de compatibilité GLIBC.
+
+## Entrée du 26 novembre 2026 — Racine cohérente pour le déploiement test
+
+- **Objectif :** corriger l'échec de l'initialisation test où le runtime d'`auth-service` était absent du répertoire `incoming`.
+- **Statut :** correction locale terminée ; workflow test à relancer.
+- **Résumé :**
+  - Le run `45815027390` était en mode `initialize` sur la branche/environnement `test`. L'étape Upload ajoutait `/test` à `SERVER_DEPLOY_ROOT`, mais cette transformation était commentée dans Apply.
+  - Le fichier runtime était donc envoyé sous `<SERVER_DEPLOY_ROOT>/test/incoming/`, tandis que le script distant le cherchait dans `<SERVER_DEPLOY_ROOT>/incoming/`.
+  - La transformation `/test` est rétablie dans Apply pour garder les deux phases sur la même racine et séparer les fichiers de test de la production.
+- **Fichiers modifiés :** `.github/workflows/deploy-planet-host.yml`, `docs/journal/2026-11-26/BASE.md`.
+- **Conventions concernées :** isolement des racines `production` et `test`; transfert et application d'une même release.
+- **Validations exécutées :**
+  - `bash -n` sur les scripts upload, deploy et remote deploy — réussi.
+  - `pnpm exec prettier --check .github/workflows/deploy-planet-host.yml docs/journal/2026-11-26/BASE.md` — réussi.
+  - `git diff --check` — réussi.
+  - `node --test deploy-tools/release-manager.test.cjs deploy-tools/publish-portals.test.cjs` — 8 tests réussis.
+  - Run GitHub Actions et initialisation PlanetHoster — en attente.
+- **Points ouverts :** vérifier qu'aucun clone/release n'existe déjà sous `<SERVER_DEPLOY_ROOT>/test`; l'initialisation ne doit jamais réutiliser la racine de production.
+- **Suite attendue :** vérifier la syntaxe et les tests ciblés, puis relancer le workflow test avec `initialize`.
+
+## Entrée du 26 novembre 2026 — Promotion contrôlée des releases test
+
+- **Objectif :** permettre la promotion d'une release construite depuis `test` vers sa racine PlanetHoster isolée sans autoriser son déploiement en production.
+- **Statut :** correction locale terminée ; publication sur la branche test et nouvelle initialisation en attente.
+- **Résumé :**
+  - Le run `45817105429` a atteint l'initialisation de la racine test mais le gestionnaire de releases refusait tout manifeste dont `ref` n'était pas `main`.
+  - L'erreur était cohérente avec l'ancien garde-fou de production, mais ce garde-fou ne distinguait pas la racine/environnement ciblé.
+  - Le déploiement transmet désormais la branche attendue au gestionnaire; celui-ci accepte seulement `main` ou `test` et exige que `manifest.ref` égale la branche cible, en plus de vérifier le commit complet.
+- **Fichiers modifiés :** `deploy-tools/release-manager.cjs`, `deploy-tools/release-manager.test.cjs`, `deploy-tools/planet-host-deploy.sh`, `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`, `docs/journal/2026-11-26/BASE.md`.
+- **Conventions concernées :** séparation production/test; validation de la branche et du commit avant promotion d'une release.
+- **Validations exécutées :**
+  - `node --test deploy-tools/release-manager.test.cjs` — 7 tests réussis, dont acceptation de `test` et rejet d'un manifeste sur la mauvaise branche.
+  - `bash -n deploy-tools/planet-host-deploy.sh` — réussi.
+  - `pnpm exec prettier --check` sur les scripts et documents modifiés — réussi.
+  - `git diff --check` — réussi.
+  - Initialisation PlanetHoster depuis `test` — en attente.
+- **Points ouverts :** publier la correction sur `test` et confirmer la première initialisation sans toucher aux répertoires de production.
+- **Suite attendue :** valider les tests/syntaxes, puis relancer l'initialisation de l'environnement test.
+
+## Entrée du 26 novembre 2026 — Résolution du runtime empaqueté Passenger
+
+- **Objectif :** retrouver le fichier runtime privé de `auth-service` lors du démarrage Passenger du paquet déployé sous `runtime/`.
+- **Statut :** correctif local en attente de validation et de déploiement sur test.
+- **Résumé :**
+  - Le fichier est installé sous `$SERVER_AUTH_SERVICE_APP_ROOT/.generated/env/auth-service.runtime.env`, tandis que le runtime compilé se trouve sous `$SERVER_AUTH_SERVICE_APP_ROOT/runtime/dist/`.
+  - Sans `RUNTIME_ENV_FILE` effectivement injecté dans l'environnement Passenger, l'ancien chemin relatif remontait trop loin dans l'arborescence du paquet et ne trouvait pas le fichier.
+  - Le chargeur cherche maintenant le runtime adjacent à l'APP_ROOT du paquet, tout en conservant le chemin explicite `RUNTIME_ENV_FILE` comme priorité et le chemin du dépôt pour les exécutions locales.
+  - La documentation distingue désormais une variable d'environnement Passenger d'une valeur écrite dans un `.env` séparé ou dans le secret GitHub `KG_PAY_APP_ENV`.
+- **Fichiers modifiés :** `services/auth-service/src/config/runtime-env.ts`, `services/auth-service/src/config/runtime-env.spec.ts`, `services/auth-service/README.md`, `README.md`, `docs/journal/2026-11-26/BASE.md`.
+- **Référence :** ADR-001 §5 (séparation et chargement des environnements runtime), CDC-01 §11.12 (démarrage avec les seules variables runtime).
+- **Validations exécutées :**
+  - `pnpm --filter auth-service exec node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand src/config/runtime-env.spec.ts` — 2 tests réussis.
+  - `pnpm exec prettier --check` sur les fichiers modifiés — réussi.
+  - `git diff --check` — réussi.
+- **Points ouverts :** confirmer que le fichier runtime existe et est lisible dans l'APP_ROOT test, puis redémarrer Passenger après publication du correctif.
+- **Suite attendue :** valider le test unitaire ciblé et le formatage, publier la correction sur `test`, puis vérifier le démarrage sans exposer les valeurs du fichier runtime.
+
+## Entrée du 26 novembre 2026 — Moteur Prisma compatible PlanetHoster
+
+- **Objectif :** inclure dans les releases le Query Engine Prisma requis par l'environnement PlanetHoster (`debian-openssl-1.1.x`).
+- **Statut :** correction locale en validation ; une nouvelle release test est nécessaire.
+- **Résumé :**
+  - Le run `20261126T133845Z` a généré le client Prisma sur le runner avec son moteur OpenSSL 3, alors que le Node.js du serveur détecte `debian-openssl-1.1.x`.
+  - Le schéma Prisma demande maintenant les moteurs `native` et `debian-openssl-1.1.x`.
+  - Le workflow échoue à la construction si le moteur cible PlanetHoster n'est pas présent dans le runtime empaqueté.
+- **Fichiers modifiés :** `services/auth-service/prisma/schema.prisma`, `.github/workflows/deploy-planet-host.yml`, `README.md`, `docs/architecture/ADR-002-applications-frontend-et-routage-mutualise.md`, `docs/journal/2026-11-26/BASE.md`.
+- **Conventions concernées :** génération Prisma du runtime d'`auth-service`; compatibilité du binaire natif avec l'OpenSSL du serveur.
+- **Validations exécutées :**
+  - `pnpm --filter auth-service exec prisma generate --schema=prisma/schema.prisma` avec une URL synthétique — réussi.
+  - Vérification ciblée du dossier client généré — `libquery_engine-debian-openssl-1.1.x.so.node` présent.
+  - `pnpm exec prettier --check` sur le workflow et les documents modifiés — réussi.
+  - `git diff --check` — réussi.
+- **Points ouverts :** produire puis démarrer une release test sur PlanetHoster; ne pas relancer la release courante sans inclure ce nouveau moteur.
+- **Suite attendue :** valider que le moteur `debian-openssl-1.1.x` est généré et empaqueté, puis publier le correctif sur `test` et redéployer.
+
+## Entrée du 26 novembre 2026 — Guide de migration de la base test PH
+
+- **Objectif :** fournir une procédure opérationnelle à partir de l'erreur `P2021` indiquant que `test.Role` n'existe pas.
+- **Statut :** guide créé ; aucune migration distante exécutée.
+- **Résumé :** le document sépare le défaut du Query Engine Prisma de l'absence de migrations dans la base test, confirme les contrôles de release et de sauvegarde, décrit l'inspection puis l'application avec `prisma migrate deploy`, et rappelle le bootstrap éventuel du premier administrateur.
+- **Fichiers modifiés :** `PLANETHOSTER-MIGRATION-TEST.md`, `docs/journal/2026-11-26/BASE.md`.
+- **Références :** CDC-01 §11.12 (démarrage avec configuration runtime valide), ADR-001 §5 (environnements séparés), [`docs/deployment/planethoster-manual-migrations.md`](../deployment/planethoster-manual-migrations.md).
+- **Validations exécutées :** documentation uniquement; aucune connexion serveur ou commande de migration exécutée par l'agent.
+- **Points ouverts :** l'opérateur doit confirmer la sauvegarde, les valeurs test, l'identifiant de release et le statut des migrations avant de lancer `migrate deploy`.
+- **Suite attendue :** suivre le guide depuis une session SSH privée, puis vérifier le redémarrage Passenger test.
+
+## Entrée du 26 novembre 2026 — Raccourci pour migration test
+
+- **Objectif :** rendre l'action courante plus simple sans exposer l'URL de base.
+- **Statut :** guide simplifié.
+- **Résumé :** ajout d'un chemin court qui charge le runtime test avec Node `--env-file`, puis lance `npx prisma migrate deploy` directement sur le schéma du clone de test.
+- **Fichiers modifiés :** `PLANETHOSTER-MIGRATION-TEST.md`, `docs/journal/2026-11-26/BASE.md`.
+- **Références :** CDC-01 §11.12; `P2021` sur `test.Role`.
+- **Validations exécutées :** documentation uniquement; aucune connexion serveur ni migration exécutée.
+- **Points ouverts :** sauvegarde et vérification de l'environnement test restent nécessaires avant la commande.
+- **Suite attendue :** exécuter le chemin court sur le serveur test puis confirmer que Passenger démarre.

@@ -3,7 +3,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { jest as jestApi } from '@jest/globals';
-import { OtpPurpose } from '@prisma/client';
+import { OtpPurpose } from '@prisma/generated';
 import { createHmac } from 'node:crypto';
 import { AuditService } from '../security/audit.service';
 import { EmailOtpService } from '../email-otp/email-otp.service';

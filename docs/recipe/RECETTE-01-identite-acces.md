@@ -52,7 +52,7 @@ Les valeurs ci-dessous sont des **défauts habituels à vérifier dans le dépô
 
 1. **PostgreSQL** (local ou Docker) accessible, base vide dédiée `auth-service`.
 2. **Maildev** démarré ; vérifier l'interface web.
-3. **Environnement** : renseigner `.env` racine depuis `.env.example`, puis générer les sorties : `pnpm env:build` et `pnpm env:runtime` (ADR-001 §5).
+3. **Environnement** : renseigner `.env` racine depuis `.env.example`, puis générer les fichiers ciblés avec `pnpm env:generate` (ADR-001 §5).
 4. **Migrations Prisma** de `auth-service`, selon son README.
 5. **Création du premier `GLOBAL_SUPER_ADMIN`** par la commande CLI ponctuelle d'`auth-service` (IAM-F-20).
 6. **`auth-service`** démarré.
@@ -121,7 +121,7 @@ Ordre recommandé : 0xx → 1xx et 2xx (parallèles) → 3xx → 4xx → 5xx →
 | --- | --- | --- | --- | --- | --- |
 | RC1-001 | P0 | M/A | Vérifier l'état des migrations Prisma de la base. | Aucune migration en attente ; schéma conforme. | CDC-01 §8.1 |
 | RC1-002 | P0 | M | Ouvrir l'interface Maildev et envoyer un message SMTP de test. | Le message apparaît. | CDC-01 §10.1 |
-| RC1-003 | P0 | M/A | Inspecter `.generated/env/auth-service.build.env` et `.runtime.env`. | Le fichier de build **ne contient aucune clé** déclarée `runtimeOnlyKeys` (clés privées, secrets SMTP, mots de passe de base) ; le fichier runtime contient les clés nécessaires uniquement ; les deux sont ignorés par Git. | ADR-001 §5 ; CDC-01 §11.12 |
+| RC1-003 | P0 | M/A | Vérifier les fichiers `.generated/env/<workspace>.env` pour `auth-service` et les deux portails. | Un seul fichier par workspace, généré depuis son schéma et ignoré par Git ; aucun fichier séparé `.build.env` ou `.runtime.env` n'est requis. | ADR-001 §5 ; CDC-01 §11.12 |
 | RC1-004 | P0 | M/A | Démarrer `auth-service` puis appeler `GET /health` **sans authentification**. | Réponse de santé positive. | CDC-01 §8.8 |
 | RC1-005 | P0 | M/A | Retirer une variable requise (ou fournir une valeur invalide) et démarrer. | Le service **refuse de démarrer** avec un message d'erreur de configuration sans valeur secrète. Restaurer ensuite. | CDC-01 §11.12 |
 | RC1-006 | P0 | M/A | Après connexion, inspecter l'en-tête du JWT et les réponses HTTP. | `alg` vaut `HS256`, aucun `kid` n'est requis, et aucune réponse ne divulgue le secret de signature. | IAM-F-05, IAM-F-06 |

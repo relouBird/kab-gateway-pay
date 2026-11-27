@@ -51,8 +51,9 @@ kgpay/
 ├── .env.example                  # modèle sans secrets
 ├── .generated/
 │   └── env/
-│       ├── auth-service.build.env
-│       └── auth-service.runtime.env
+│       ├── auth-service.env
+│       ├── customer-portal.env
+│       └── staff-portal.env
 ├── packages/                     # packages partagés (techniques)
 │   ├── config/                   # @kgpay/config
 │   ├── contracts/                # @kgpay/contracts
@@ -66,7 +67,7 @@ kgpay/
 │       ├── env.schema.json       # contrat des variables attendues et partagées
 │       └── Dockerfile
 ├── scripts/
-│   └── generate-env.cjs         # génération filtrée par workspace et usage
+│   └── generate-env.cjs         # génération filtrée par workspace
 ├── pnpm-workspace.yaml
 └── turbo.json
 ```
@@ -91,9 +92,7 @@ kgpay/
 
 - `.env` à la racine : source locale unique, ignorée par Git. Elle peut contenir des secrets runtime ; elle ne doit jamais être committée.
 - `.env.example` à la racine : modèle versionné, sans credentials ni vraies clés. Il documente les noms de variables et les valeurs locales non secrètes.
-- `services/<service>/env.schema.json`, `apps/<app>/env.schema.json` ou `packages/<package>/env.schema.json` : contrat de variables du workspace. Le schéma conserve `properties`, `requiredKeys`, `sharedKeys`, `forbiddenKeys` et `forbiddenKeyPatterns`, et peut déclarer `targetPrefix`, `runtimeOnlyKeys` et `runtimeRequiredKeys`.
-- `.generated/env/<workspace>.build.env` : sortie temporaire au build, contenant uniquement les variables autorisées au build.
-- `.generated/env/<workspace>.runtime.env` : sortie temporaire au lancement/migration, contenant les variables nécessaires à ce workspace, y compris les secrets runtime autorisés.
+- `services/<service>/env.schema.json`, `apps/<app>/env.schema.json` ou `packages/<package>/env.schema.json` : contrat de variables du workspace. Le schéma conserve `properties`, `requiredKeys`, `sharedKeys`, `forbiddenKeys` et `forbiddenKeyPatterns`, et peut déclarer `targetPrefix`.
 
 Exemple pour le dépôt actuel :
 
@@ -102,20 +101,20 @@ kgpay/
 ├── .env
 ├── .env.example
 ├── .generated/env/
-│   ├── auth-service.build.env
-│   └── auth-service.runtime.env
+│   ├── auth-service.env
+│   ├── customer-portal.env
+│   └── staff-portal.env
 └── services/auth-service/env.schema.json
 ```
 
 Le `.env` racine est la seule source modifiée à la main. Les noms `GLOBAL__<KEY>` alimentent les clés marquées `sharedKeys` ; les autres clés utilisent le suffixe de cible, par exemple `DATABASE_URL__AUTH_SERVICE`. Le générateur valide les clés, les types, les valeurs requises et les clés non reconnues, puis retire le suffixe de source pour produire les clés que le code cible attend (`DATABASE_URL`, `PORT`, etc.). Une valeur présente dans l'environnement du processus a priorité sur celle du fichier racine.
 
-**Séparation build/runtime**
+**Un fichier généré par workspace**
 
-1. `pnpm env:build` génère un fichier `.build.env` par workspace qui déclare un schéma. Les tâches Turbo `build` déclenchent cette génération avant de lancer les builds ; le build direct d'un workspace fait de même.
-2. `runtimeOnlyKeys` exclut explicitement les credentials et clés privées de toute sortie de build. Une URL de base contenant un mot de passe, les clés HMAC/JWT, les credentials SMTP et les secrets de clients internes ne sont donc pas copiés dans `dist`, les caches de build ou les bundles frontend.
-3. `pnpm env:runtime` génère les `.runtime.env` par workspace. Turbo le lance avant `dev` ; un démarrage ou une migration ciblée génère aussi la sortie propre au service concerné.
-4. `auth-service` charge uniquement `.generated/env/auth-service.runtime.env` au démarrage. `run-prisma.cjs` génère puis charge ce même fichier avant la commande Prisma. En production, la même source unique peut être injectée de manière sécurisée avant génération ; elle n'est jamais incluse dans l'artefact compilé.
-5. Les deux sorties résident sous `.generated/env/` à la racine du dépôt, sont ignorées par Git et ne sont pas copiées dans `dist`. Elles peuvent être régénérées à tout moment depuis `.env`.
+1. `pnpm env:generate` produit un unique `.env` généré par workspace qui déclare un schéma; `--target` limite la génération à une cible. Les scripts du workspace le régénèrent avant les opérations concernées.
+2. Chaque fichier contient les variables requises et optionnelles déclarées par son schéma, y compris les secrets nécessaires au service. Les portails ne déclarent que des variables `VITE_*` publiques. Aucun fichier d'environnement n'est placé dans `dist`, un bundle web ou une archive de release.
+3. Le loader d'`auth-service` charge `.generated/env/auth-service.env` au démarrage, pour le bootstrap et depuis Prisma Config. Cette dernière utilise donc le même `DATABASE_URL` que le service; il n'existe ni résolveur dédié Prisma ni wrapper Prisma d'environnement. `KG_PAY_ENV_FILE` permet de sélectionner un fichier privé externe, notamment depuis le clone source PlanetHoster.
+4. Les fichiers générés résident sous `.generated/env/` à la racine du dépôt, sont ignorés par Git et peuvent être recréés depuis `.env`. Les packages partagés n'ont pas d'environnement par défaut : une librairie reçoit sa configuration par le service ou l'application qui l'utilise.
 
 Les noms suffixés permettent de stocker dans un seul `.env` les valeurs de services ou d'applications ayant le même nom de variable sans collision. Les packages partagés n'ont pas d'environnement par défaut : une librairie reçoit sa configuration par le service ou l'application qui l'utilise ; une cible dédiée ne sera ajoutée que si un besoin de build réel l'exige.
 
@@ -166,5 +165,7 @@ Basé sur l'hypothèse du référentiel v0.3 §8.1, précisé pour des services 
 | --- | --- | --- |
 | 1 — Identité et accès | 20 nov. 2026 | Création de l'ADR. Choix D8 (JWT asymétrique + JWKS) induit par l'absence de gateway. |
 | Bootstrap du dépôt | 21 nov. 2026 | Le porteur valide pnpm workspaces et Turborepo ; le dépôt Git local est initialisé sur `main` avec `dev` comme branche d'intégration. |
-| Cœur 1 — backend | 22 nov. 2026 | Une source locale unique `.env` à la racine, filtrée selon les schémas de workspace vers `.generated/env/<workspace>.build.env` et `.runtime.env`. Les secrets restent runtime-only ; les démarrages PostgreSQL et Maildev locaux ou Docker sont documentés. Le relay local d'outbox n'impose pas de broker. |
+| Cœur 1 — backend | 22 nov. 2026 | Décision initiale : une source locale unique `.env` à la racine, filtrée vers des fichiers build/runtime distincts. Cette convention est remplacée le 27 nov. 2026 par la décision « environnement unique » ci-dessous. Les démarrages PostgreSQL et Maildev locaux ou Docker sont documentés. Le relay local d'outbox n'impose pas de broker. |
 | Cœur 1 — signature des jetons | 25 nov. 2026 | D8 est remplacée par la décision HS256 avec secret runtime partagé et vérification/rotation par chevauchement ; aucun JWKS, `kid` ni fichier de clé RSA. Le risque de fabrication de jetons par un vérificateur compromis est documenté. |
+| Cœur 1 — outillage Prisma | 27 nov. 2026 | Prisma ORM 7.8.0 et le client généré dans `src/generated/prisma` sont adoptés. Prisma Config charge uniquement l'URL PostgreSQL requise; l'adapter `pg` remplace le moteur natif Prisma. Les migrations serveur restent exécutables avec npm, sans installer pnpm ni les dépendances du workspace. |
+| Cœur 1 — environnement unique | 27 nov. 2026 | Le porteur du projet demande un fichier généré unique par workspace, commun au build, au démarrage et à Prisma Config. Les sorties build/runtime et wrappers Prisma dédiés sont retirés; `KG_PAY_ENV_FILE` reste le sélecteur générique pour un fichier privé externe. |

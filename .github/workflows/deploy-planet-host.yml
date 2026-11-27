@@ -1,7 +1,7 @@
 name: Build and deploy KG Pay to PlanetHoster
 
 # Workflow interne partagé par le premier déploiement et les déploiements normaux.
-# Le build et les environnements runtime sont préparés sur GitHub, puis publiés sur PH.
+# Le build et les fichiers d'environnement sont préparés sur GitHub, puis publiés sur PH.
 on:
   workflow_call:
     inputs:
@@ -90,7 +90,6 @@ jobs:
           set -euo pipefail
           node --test \
             scripts/generate-env.test.cjs \
-            scripts/run-prisma.test.cjs \
             scripts/bump-version.test.cjs \
             deploy-tools/release-manager.test.cjs \
             deploy-tools/publish-portals.test.cjs
@@ -102,7 +101,7 @@ jobs:
             bash -n "$script"
           done
 
-      - name: Build workspaces and generate production runtime environments
+      - name: Build workspaces and stage the auth-service environment
         env:
           KG_PAY_APP_ENV: ${{ secrets.KG_PAY_APP_ENV }}
         shell: bash
@@ -113,22 +112,21 @@ jobs:
           (umask 077; printf '%s' "$KG_PAY_APP_ENV" > .env)
           unset KG_PAY_APP_ENV
 
-          # Keep web build output readable; protect only the source and runtime env files.
+          # Keep web build output readable; protect the source and generated environment files.
           umask 022
           pnpm run build
-          (umask 077; pnpm run env:runtime)
 
-          generated_runtime_env=".generated/env/auth-service.runtime.env"
-          runtime_env="$RUNNER_TEMP/kgpay-auth-service-runtime.env"
-          if [[ ! -s "$generated_runtime_env" ]]; then
-            echo "::error::auth-service production runtime environment was not generated."
+          generated_service_env=".generated/env/auth-service.env"
+          service_env="$RUNNER_TEMP/kgpay-auth-service.env"
+          if [[ ! -s "$generated_service_env" ]]; then
+            echo "::error::auth-service production environment was not generated."
             exit 1
           fi
-          if ! grep -Eq '^NODE_ENV=production\r?$' "$generated_runtime_env"; then
-            echo "::error::auth-service runtime environment must configure production mode."
+          if ! grep -Eq '^NODE_ENV=production\r?$' "$generated_service_env"; then
+            echo "::error::auth-service environment must configure production mode."
             exit 1
           fi
-          install -m 600 "$generated_runtime_env" "$runtime_env"
+          install -m 600 "$generated_service_env" "$service_env"
 
       - name: Package static builds and auth-service runtime
         shell: bash
@@ -167,20 +165,25 @@ jobs:
           (
             cd "$release_dir/services/auth-service"
             test ! -e .env
-            DATABASE_URL="postgresql://build:synthetic@127.0.0.1:5432/kgpay" \
-              npm exec --yes --package=prisma@6.19.3 -- \
-              prisma generate --schema=prisma/schema.prisma
-            node -e "
-              require('@kgpay/contracts');
-              require('@nestjs/core');
-              require('argon2');
-              const { PrismaClient } = require('@prisma/client');
-              if (typeof PrismaClient !== 'function') process.exit(1);
-            "
+            node <<'NODE'
+          require('@kgpay/contracts');
+          require('@nestjs/core');
+          require('argon2');
+          const { PrismaClient } = require('./dist/generated/prisma/client.js');
+          const { PrismaPg } = require('@prisma/adapter-pg');
+          const adapter = new PrismaPg({
+            connectionString: 'postgresql://build:synthetic@127.0.0.1:5432/kgpay',
+            connectionTimeoutMillis: 1000,
+          });
+          const prisma = new PrismaClient({ adapter });
+          if (typeof prisma.$connect !== 'function') process.exit(1);
+          prisma.$disconnect().catch(() => { process.exitCode = 1; });
+          NODE
           )
 
           test -f "$release_dir/packages/contracts/dist/index.js"
           test -f "$release_dir/services/auth-service/dist/main.js"
+          test -f "$release_dir/services/auth-service/dist/generated/prisma/client.js"
           test -f "$release_dir/services/auth-service/dist/cli/bootstrap-super-admin.js"
           test -f "$release_dir/services/auth-service/prisma/schema.prisma"
           test -f "$release_dir/services/auth-service/prisma/migrations/migration_lock.toml"
@@ -293,5 +296,5 @@ jobs:
         shell: bash
         run: |
           rm -f -- \
-            "$RUNNER_TEMP/kgpay-auth-service-runtime.env" \
+            "$RUNNER_TEMP/kgpay-auth-service.env" \
             "$RUNNER_TEMP/deploy_key"
